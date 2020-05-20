@@ -27,10 +27,8 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     using SafeERC20 for ERC20;
     using SafeMath  for uint256;
 
-    /**
-    Hardcoded constants to save gas
-    bytes32 public constant CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
-    */
+
+    //bytes32 public constant CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
     bytes32 public constant CONTROLLER_ROLE = 0x7b765e0e932d348852a6f810bfa1ab891e259123f02db8cdcde614c570223357;
 
     uint256 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10 ** 16; 100% = 10 ** 18
