@@ -27,7 +27,6 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     using SafeERC20 for ERC20;
     using SafeMath  for uint256;
 
-
     //bytes32 public constant CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
     bytes32 public constant CONTROLLER_ROLE = 0x7b765e0e932d348852a6f810bfa1ab891e259123f02db8cdcde614c570223357;
 
@@ -91,14 +90,16 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
         address indexed collateral,
         uint256 fee,
         uint256 purchaseAmount,
-        uint256 returnedAmount
+        uint256 returnedAmount,
+        uint256 feePct
     );
     event MakeSellOrder(
         address indexed seller,
         address indexed collateral,
         uint256 fee,
         uint256 sellAmount,
-        uint256 returnAmount
+        uint256 returnedAmount,
+        uint256 feePct
     );
 
     /**
@@ -301,7 +302,7 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
             tokenManager.mint(_buyer, returnAmount);
         }
 
-        emit MakeBuyOrder(_buyer, _collateral, fee, depositAmountLessFee, returnAmount);
+        emit MakeBuyOrder(_buyer, _collateral, fee, depositAmountLessFee, returnAmount, buyFeePct);
     }
 
     /**
@@ -337,7 +338,7 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
             reserve.transfer(_collateral, beneficiary, fee);
         }
 
-        emit MakeSellOrder(_seller, _collateral, _sellAmount, fee, returnAmountLessFee);
+        emit MakeSellOrder(_seller, _collateral, _sellAmount, fee, returnAmountLessFee, sellFeePct);
     }
 
     /***** public view functions *****/
