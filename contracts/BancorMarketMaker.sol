@@ -338,7 +338,7 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
             reserve.transfer(_collateral, beneficiary, fee);
         }
 
-        emit MakeSellOrder(_seller, _collateral, _sellAmount, fee, returnAmountLessFee, sellFeePct);
+        emit MakeSellOrder(_seller, _collateral, fee, _sellAmount, returnAmountLessFee, sellFeePct);
     }
 
     /***** public view functions *****/
