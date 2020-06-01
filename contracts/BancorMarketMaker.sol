@@ -11,18 +11,6 @@ import "@aragon/apps-vault/contracts/Vault.sol";
 import "@ablack/fundraising-bancor-formula/contracts/BancorFormula.sol";
 import "../../aragon-fundraising/contracts/IAragonFundraisingController.sol";
 
-
-// TODO: Removed functions that may be referenced in the UI:
-// getCurrentBatchId()
-// getBatch(uint256 _batchId, address _collateral)
-// openBuyOrder()
-// claimBuyOrder()
-// claimCancelledBuyOrder()
-// openSellOrder()
-// claimSellOrder()
-// claimCancelledSellOrder()
-// removed slippage from collateral tokens
-
 contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     using SafeERC20 for ERC20;
     using SafeMath  for uint256;
@@ -101,39 +89,6 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
         uint256 returnedAmount,
         uint256 feePct
     );
-
-    /**
-    uint256 public tokensToBeMinted;
-    uint256                        public batchBlocks;
-    mapping(address => uint256)    public collateralsToBeClaimed;
-    mapping(uint256 => MetaBatch)  public metaBatches;
-
-    event NewMetaBatch           (uint256 indexed id, uint256 supply, uint256 buyFeePct, uint256 sellFeePct, address formula);
-    event NewBatch               (
-        uint256 indexed id,
-        address indexed collateral,
-        uint256 supply,
-        uint256 balance,
-        uint32  reserveRatio,
-        uint256 slippage)
-    ;
-    event CancelBatch            (uint256 indexed id, address indexed collateral);
-    event OpenBuyOrder           (address indexed buyer, uint256 indexed batchId, address indexed collateral, uint256 fee, uint256 value);
-    event OpenSellOrder          (address indexed seller, uint256 indexed batchId, address indexed collateral, uint256 amount);
-    event ClaimBuyOrder          (address indexed buyer, uint256 indexed batchId, address indexed collateral, uint256 amount);
-    event ClaimSellOrder         (address indexed seller, uint256 indexed batchId, address indexed collateral, uint256 fee, uint256 value);
-    event ClaimCancelledBuyOrder (address indexed buyer, uint256 indexed batchId, address indexed collateral, uint256 value);
-    event ClaimCancelledSellOrder(address indexed seller, uint256 indexed batchId, address indexed collateral, uint256 amount);
-    event UpdatePricing          (
-        uint256 indexed batchId,
-        address indexed collateral,
-        uint256 totalBuySpend,
-        uint256 totalBuyReturn,
-        uint256 totalSellSpend,
-        uint256 totalSellReturn
-    );
-    */
-
 
     /***** external function *****/
 

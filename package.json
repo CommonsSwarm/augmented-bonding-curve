@@ -1,5 +1,5 @@
 {
-  "name": "@ablack/fundraising-batched-bancor-market-maker",
+  "name": "@1hive/apps-marketplace-bancor-market-maker",
   "version": "1.0.0",
   "author": "Aragon Assocation <legal@aragon.org>",
   "contributors": [
@@ -7,7 +7,7 @@
     "Billy Rennekamp <billy@bin.am>"
   ],
   "license": "(GPL-3.0-or-later OR AGPL-3.0-or-later)",
-  "homepage": "https://github.com/AragonBlack/fundraising",
+  "homepage": "https://github.com/1Hive/marketplace-app",
   "scripts": {
     "lint": "solium --dir ./contracts --config ../../.soliumrc.json",
     "compile": "truffle compile",
