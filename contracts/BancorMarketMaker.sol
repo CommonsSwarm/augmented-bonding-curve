@@ -9,7 +9,7 @@ import "@aragon/os/contracts/lib/token/ERC20.sol";
 import "@aragon/apps-token-manager/contracts/TokenManager.sol";
 import "@aragon/apps-vault/contracts/Vault.sol";
 import "@ablack/fundraising-bancor-formula/contracts/BancorFormula.sol";
-import "../../aragon-fundraising/contracts/IAragonFundraisingController.sol";
+import "../../marketplace-controller/contracts/IMarketplaceController.sol";
 
 contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     using SafeERC20 for ERC20;
@@ -43,7 +43,7 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
         uint32  reserveRatio;
     }
 
-    IAragonFundraisingController public controller;
+    IMarketplaceController public controller;
     TokenManager public tokenManager;
     ERC20 public token;
     Vault public reserve;
@@ -103,7 +103,7 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
      * @param _sellFeePct   The fee to be deducted from sell orders [in PCT_BASE]
     */
     function initialize(
-        IAragonFundraisingController _controller,
+        IMarketplaceController       _controller,
         TokenManager                 _tokenManager,
         IBancorFormula               _formula,
         Vault                        _reserve,

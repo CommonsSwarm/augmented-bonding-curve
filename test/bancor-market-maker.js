@@ -22,7 +22,7 @@ const forEach = require('mocha-each')
 
 const RESERVE_ID = hash('agent.aragonpm.eth')
 const TOKEN_MANAGER_ID = hash('token-manager.aragonpm.eth')
-const CONTROLLER_ID = hash('aragon-fundraising.aragonpm.eth')
+const CONTROLLER_ID = hash('marketplace-controller.aragonpm.eth')
 const MARKET_MAKER_ID = hash('bancor-market-maker.aragonpm.eth')
 
 const INITIAL_TOKEN_BALANCE = 10000 * Math.pow(10, 18) // 10000 DAIs or ANTs
