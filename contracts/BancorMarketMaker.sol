@@ -34,6 +34,7 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     string private constant ERROR_COLLATERAL_ALREADY_WHITELISTED = "MM_COLLATERAL_ALREADY_WHITELISTED";
     string private constant ERROR_COLLATERAL_NOT_WHITELISTED     = "MM_COLLATERAL_NOT_WHITELISTED";
     string private constant ERROR_SLIPPAGE_EXCEEDS_LIMIT         = "MM_SLIPPAGE_EXCEEDS_LIMIT";
+    string private constant ERROR_TOKEN_TRANSFER_REVERTED = "VAULT_TOKEN_TRANSFER_REVERTED";
     string private constant ERROR_TRANSFER_FROM_FAILED           = "MM_TRANSFER_FROM_FAILED";
 
     struct Collateral {
@@ -341,6 +342,11 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
             return _msgValue == _value;
         }
 
+        // If tokens have already been received in an ERC777 Send() transaction
+//        if (controller.balanceOf(address(this), _collateral) >= _value) {
+//            return true;
+//        }
+
         return (
             _msgValue == 0 &&
             controller.balanceOf(_buyer, _collateral) >= _value &&
@@ -424,6 +430,8 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     function _transfer(address _from, address _to, address _collateralToken, uint256 _amount) internal {
         if (_collateralToken == ETH) {
             _to.transfer(_amount);
+//        } else if (controller.balanceOf(address(this), _collateralToken) >= _amount) {
+//            require(ERC20(_collateralToken).safeTransfer(_to, _amount), ERROR_TOKEN_TRANSFER_REVERTED);
         } else {
             require(ERC20(_collateralToken).safeTransferFrom(_from, _to, _amount), ERROR_TRANSFER_FROM_FAILED);
         }
