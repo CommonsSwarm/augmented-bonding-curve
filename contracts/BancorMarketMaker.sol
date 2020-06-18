@@ -34,7 +34,7 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     string private constant ERROR_COLLATERAL_ALREADY_WHITELISTED = "MM_COLLATERAL_ALREADY_WHITELISTED";
     string private constant ERROR_COLLATERAL_NOT_WHITELISTED     = "MM_COLLATERAL_NOT_WHITELISTED";
     string private constant ERROR_SLIPPAGE_EXCEEDS_LIMIT         = "MM_SLIPPAGE_EXCEEDS_LIMIT";
-    string private constant ERROR_TOKEN_TRANSFER_REVERTED = "VAULT_TOKEN_TRANSFER_REVERTED";
+//    string private constant ERROR_TOKEN_TRANSFER_REVERTED        = "VAULT_TOKEN_TRANSFER_REVERTED";
     string private constant ERROR_TRANSFER_FROM_FAILED           = "MM_TRANSFER_FROM_FAILED";
 
     struct Collateral {
