@@ -38,7 +38,7 @@ const RESERVE_RATIOS = [(PPM * 10) / 100, (PPM * 1) / 100]
 
 const { ETH } = require('@ablack/fundraising-shared-test-helpers/constants')
 
-contract('BatchedBancorMarketMaker app', accounts => {
+contract('BancorMarketMaker app', accounts => {
   let factory, dao, acl, cBase, tBase, rBase, mBase, token, tokenManager, controller, reserve, formula, marketMaker,
     collateral, collaterals
   let APP_MANAGER_ROLE,
@@ -79,6 +79,7 @@ contract('BatchedBancorMarketMaker app', accounts => {
     await acl.createPermission(marketMaker.address, reserve.address, TRANSFER_ROLE, root, { from: root })
     await acl.createPermission(authorized, marketMaker.address, CONTROLLER_ROLE, root, { from: root })
     await acl.grantPermission(authorized2, marketMaker.address, CONTROLLER_ROLE, { from: root })
+    await acl.grantPermission(marketMaker.address, marketMaker.address, CONTROLLER_ROLE, { from: root })
     // collaterals
     collateral = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE * 2)
     await collateral.transfer(authorized2, INITIAL_TOKEN_BALANCE, { from: authorized })
@@ -967,6 +968,60 @@ contract('BatchedBancorMarketMaker app', accounts => {
             0, { from: unauthorized }), "APP_AUTH_FAILED")
         })
       })
+    })
+  })
+  // #endregion
+
+  // #region makeSellOrder
+  context.only('> #makeBuyOrderRaw', () => {
+    it('successfully calls makeBuyOrder()', async () => {
+      const amount = random.amount()
+      const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized, collaterals[1], amount, 0)
+
+      const receipt = await marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized })
+
+      assertEvent(receipt, 'MakeBuyOrder(address,address,uint256,uint256,uint256,uint256)')
+    })
+
+    it('reverts when does not have CONTROLLER_ROLE', async () => {
+      const amount = random.amount()
+      const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized, collaterals[1], amount, 0)
+      await acl.revokePermission(authorized, marketMaker.address, CONTROLLER_ROLE, { from: root })
+
+      await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
+        "APP_AUTH_FAILED")
+    })
+
+    it('reverts when data is for function other than makeBuyOrder', async () => {
+      const amount = random.amount()
+      const makeBuyOrderData = marketMaker.contract.makeSellOrder.getData(authorized, collaterals[1], amount, 0)
+
+      await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
+        "MM_NOT_BUY_FUNCTION")
+    })
+
+    it('reverts when buyer in data is not equal to from address', async () => {
+      const amount = random.amount()
+      const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized2, collaterals[1], amount, 0)
+
+      await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
+        "MM_BUYER_NOT_FROM")
+    })
+
+    it('reverts when collateral in data is not equal to token address', async () => {
+      const amount = random.amount()
+      const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized, authorized, amount, 0)
+
+      await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
+        "MM_COLLATERAL_NOT_SENDER")
+    })
+
+    it('reverts when deposit amount in data is not equal to token amount', async () => {
+      const amount = random.amount()
+      const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized, collaterals[1], amount.add(1), 0)
+
+      await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
+        "MM_DEPOSIT_NOT_AMOUNT")
     })
   })
   // #endregion

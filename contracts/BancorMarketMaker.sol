@@ -34,8 +34,12 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     string private constant ERROR_COLLATERAL_ALREADY_WHITELISTED = "MM_COLLATERAL_ALREADY_WHITELISTED";
     string private constant ERROR_COLLATERAL_NOT_WHITELISTED     = "MM_COLLATERAL_NOT_WHITELISTED";
     string private constant ERROR_SLIPPAGE_EXCEEDS_LIMIT         = "MM_SLIPPAGE_EXCEEDS_LIMIT";
-//    string private constant ERROR_TOKEN_TRANSFER_REVERTED        = "VAULT_TOKEN_TRANSFER_REVERTED";
     string private constant ERROR_TRANSFER_FROM_FAILED           = "MM_TRANSFER_FROM_FAILED";
+    string private constant ERROR_NOT_BUY_FUNCTION               = "MM_NOT_BUY_FUNCTION";
+    string private constant ERROR_BUYER_NOT_FROM                 = "MM_BUYER_NOT_FROM";
+    string private constant ERROR_COLLATERAL_NOT_SENDER          = "MM_COLLATERAL_NOT_SENDER";
+    string private constant ERROR_DEPOSIT_NOT_AMOUNT             = "MM_DEPOSIT_NOT_AMOUNT";
+    string private constant ERROR_CALL_FAILED                    = "MM_CALL_FAILED";
 
     struct Collateral {
         bool    whitelisted;
@@ -297,6 +301,49 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
         emit MakeSellOrder(_seller, _collateral, fee, _sellAmount, returnAmountLessFee, sellFeePct);
     }
 
+    /**
+     * @dev Make a buy order using makeBuyOrder() function data. Used for single transaction ERC20 buy orders, ones
+     *      without a pre-approval transaction, but that have been approved in this transaction.
+     * @param _from Token sender
+     * @param _token Token that received approval
+     * @param _amount Token amount
+     * @param _buyOrderData Data for the below function call
+     *      makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
+    */
+    function makeBuyOrderRaw(address _from, address _token, uint256 _amount, bytes _buyOrderData)
+        external auth(CONTROLLER_ROLE)
+    {
+        bytes memory buyOrderDataMemory = _buyOrderData;
+
+        bytes4 functionSig;
+        address buyerAddress;
+        address collateralTokenAddress;
+        uint256 depositAmount;
+
+        assembly {
+            // functionSigByteLocation: 32 (bytes array length)
+            functionSig := mload(add(buyOrderDataMemory, 32))
+
+            // buyerAddressByteLocation: 32 + 4 = 36 (bytes array length + sig)
+            buyerAddress := mload(add(buyOrderDataMemory, 36))
+
+            // collateralAddressByteLocation: 32 + 4 + 32 = 68 (bytes array length + sig + _buyer address)
+            collateralTokenAddress := mload(add(buyOrderDataMemory, 68))
+
+            // depositAmountByteLocation: 32 + 4 + 32 + 32 = 100 (bytes array length + sig + _buyer address + _collateral address)
+            depositAmount := mload(add(buyOrderDataMemory, 100))
+        }
+
+        require(functionSig == this.makeBuyOrder.selector, ERROR_NOT_BUY_FUNCTION);
+        require(buyerAddress == _from, ERROR_BUYER_NOT_FROM);
+        require(collateralTokenAddress == _token, ERROR_COLLATERAL_NOT_SENDER);
+        require(depositAmount == _amount, ERROR_DEPOSIT_NOT_AMOUNT);
+
+        // TODO: Should we extract the minReturnAmountAfterFee and just call directly?
+        // Note this approach requires this contract have the CONTROLLER_ROLE.
+        require(address(this).call(_buyOrderData), ERROR_CALL_FAILED);
+    }
+
     /***** public view functions *****/
 
     function getCollateralToken(address _collateral) public view isInitialized returns (bool, uint256, uint256, uint32) {
@@ -341,11 +388,6 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
         if (_collateral == ETH) {
             return _msgValue == _value;
         }
-
-        // If tokens have already been received in an ERC777 Send() transaction
-//        if (controller.balanceOf(address(this), _collateral) >= _value) {
-//            return true;
-//        }
 
         return (
             _msgValue == 0 &&
@@ -430,8 +472,6 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     function _transfer(address _from, address _to, address _collateralToken, uint256 _amount) internal {
         if (_collateralToken == ETH) {
             _to.transfer(_amount);
-//        } else if (controller.balanceOf(address(this), _collateralToken) >= _amount) {
-//            require(ERC20(_collateralToken).safeTransfer(_to, _amount), ERROR_TOKEN_TRANSFER_REVERTED);
         } else {
             require(ERC20(_collateralToken).safeTransferFrom(_from, _to, _amount), ERROR_TRANSFER_FROM_FAILED);
         }
