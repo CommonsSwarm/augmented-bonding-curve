@@ -973,7 +973,7 @@ contract('BancorMarketMaker app', accounts => {
   // #endregion
 
   // #region makeSellOrder
-  context.only('> #makeBuyOrderRaw', () => {
+  context('> #makeBuyOrderRaw', () => {
     it('successfully calls makeBuyOrder()', async () => {
       const amount = random.amount()
       const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized, collaterals[1], amount, 0)
