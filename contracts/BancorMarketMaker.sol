@@ -235,7 +235,63 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
      * @param _minReturnAmountAfterFee The minimum amount of the returned bonded tokens
      */
     function makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
-        external payable nonReentrant auth(CONTROLLER_ROLE)
+        external payable auth(CONTROLLER_ROLE)
+    {
+        _makeBuyOrder(_buyer, _collateral, _depositAmount, _minReturnAmountAfterFee);
+    }
+
+    /**
+     * @dev Make a buy order using makeBuyOrder() function data. Used for single transaction ERC20 buy orders, ones
+     *      without a pre-approval transaction, but that have been approved in this transaction.
+     * @param _from Token sender
+     * @param _token Token that received approval
+     * @param _amount Token amount
+     * @param _buyOrderData Data for the below function call
+     *      makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
+    */
+    function makeBuyOrderRaw(address _from, address _token, uint256 _amount, bytes _buyOrderData)
+        external auth(CONTROLLER_ROLE)
+    {
+        bytes memory buyOrderDataMemory = _buyOrderData;
+
+        bytes4 functionSig;
+        address buyerAddress;
+        address collateralTokenAddress;
+        uint256 depositAmount;
+        uint256 minReturnAmountAfterFee;
+
+        assembly {
+            // functionSigByteLocation: 32 (bytes array length)
+            functionSig := mload(add(buyOrderDataMemory, 32))
+
+            // buyerAddressByteLocation: 32 + 4 = 36 (bytes array length + sig)
+            buyerAddress := mload(add(buyOrderDataMemory, 36))
+
+            // collateralAddressByteLocation: 32 + 4 + 32 = 68 (bytes array length + sig + address _buyer)
+            collateralTokenAddress := mload(add(buyOrderDataMemory, 68))
+
+            // depositAmountByteLocation: 32 + 4 + 32 + 32 = 100 (bytes array length + sig + address _buyer + address _collateral)
+            depositAmount := mload(add(buyOrderDataMemory, 100))
+
+            // minReturnAmountAfterFeeByteLocation: 32 + 4 + 32 + 32 + 32 = 132 (bytes array length + sig + address _buyer + address _collateral + uint256 _depositAmount)
+            minReturnAmountAfterFee := mload(add(buyOrderDataMemory, 132))
+        }
+
+        require(functionSig == this.makeBuyOrder.selector, ERROR_NOT_BUY_FUNCTION);
+        require(buyerAddress == _from, ERROR_BUYER_NOT_FROM);
+        require(collateralTokenAddress == _token, ERROR_COLLATERAL_NOT_SENDER);
+        require(depositAmount == _amount, ERROR_DEPOSIT_NOT_AMOUNT);
+
+        _makeBuyOrder(buyerAddress, collateralTokenAddress, depositAmount, minReturnAmountAfterFee);
+    }
+
+    /**
+     * @dev This functions args should be the same as the external makeBuyOrder() function to ensure
+     *      compatibility with makeBuyOrderRaw() as the buyOrderData for that function will be created
+     *      from the external makeBuyOrder() function
+     */
+    function _makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
+        internal nonReentrant
     {
         require(isOpen, ERROR_NOT_OPEN);
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
@@ -299,49 +355,6 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
         }
 
         emit MakeSellOrder(_seller, _collateral, fee, _sellAmount, returnAmountLessFee, sellFeePct);
-    }
-
-    /**
-     * @dev Make a buy order using makeBuyOrder() function data. Used for single transaction ERC20 buy orders, ones
-     *      without a pre-approval transaction, but that have been approved in this transaction.
-     * @param _from Token sender
-     * @param _token Token that received approval
-     * @param _amount Token amount
-     * @param _buyOrderData Data for the below function call
-     *      makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
-    */
-    function makeBuyOrderRaw(address _from, address _token, uint256 _amount, bytes _buyOrderData)
-        external auth(CONTROLLER_ROLE)
-    {
-        bytes memory buyOrderDataMemory = _buyOrderData;
-
-        bytes4 functionSig;
-        address buyerAddress;
-        address collateralTokenAddress;
-        uint256 depositAmount;
-
-        assembly {
-            // functionSigByteLocation: 32 (bytes array length)
-            functionSig := mload(add(buyOrderDataMemory, 32))
-
-            // buyerAddressByteLocation: 32 + 4 = 36 (bytes array length + sig)
-            buyerAddress := mload(add(buyOrderDataMemory, 36))
-
-            // collateralAddressByteLocation: 32 + 4 + 32 = 68 (bytes array length + sig + _buyer address)
-            collateralTokenAddress := mload(add(buyOrderDataMemory, 68))
-
-            // depositAmountByteLocation: 32 + 4 + 32 + 32 = 100 (bytes array length + sig + _buyer address + _collateral address)
-            depositAmount := mload(add(buyOrderDataMemory, 100))
-        }
-
-        require(functionSig == this.makeBuyOrder.selector, ERROR_NOT_BUY_FUNCTION);
-        require(buyerAddress == _from, ERROR_BUYER_NOT_FROM);
-        require(collateralTokenAddress == _token, ERROR_COLLATERAL_NOT_SENDER);
-        require(depositAmount == _amount, ERROR_DEPOSIT_NOT_AMOUNT);
-
-        // TODO: Should we extract the minReturnAmountAfterFee and just call directly?
-        // Note this approach requires this contract have the CONTROLLER_ROLE.
-        require(address(this).call(_buyOrderData), ERROR_CALL_FAILED);
     }
 
     /***** public view functions *****/

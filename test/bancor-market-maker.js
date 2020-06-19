@@ -79,7 +79,6 @@ contract('BancorMarketMaker app', accounts => {
     await acl.createPermission(marketMaker.address, reserve.address, TRANSFER_ROLE, root, { from: root })
     await acl.createPermission(authorized, marketMaker.address, CONTROLLER_ROLE, root, { from: root })
     await acl.grantPermission(authorized2, marketMaker.address, CONTROLLER_ROLE, { from: root })
-    await acl.grantPermission(marketMaker.address, marketMaker.address, CONTROLLER_ROLE, { from: root })
     // collaterals
     collateral = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE * 2)
     await collateral.transfer(authorized2, INITIAL_TOKEN_BALANCE, { from: authorized })
