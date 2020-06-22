@@ -972,9 +972,16 @@ contract('BancorMarketMaker app', accounts => {
   // #endregion
 
   // #region makeSellOrder
-  context('> #makeBuyOrderRaw', () => {
+  context.only('> #makeBuyOrderRaw', () => {
+
+    let amount
+
+    beforeEach(async () => {
+      amount = random.amount()
+      await collateral.transfer(marketMaker.address, amount, { from: authorized })
+    })
+
     it('successfully calls makeBuyOrder()', async () => {
-      const amount = random.amount()
       const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized, collaterals[1], amount, 0)
 
       const receipt = await marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized })
@@ -983,7 +990,6 @@ contract('BancorMarketMaker app', accounts => {
     })
 
     it('reverts when does not have CONTROLLER_ROLE', async () => {
-      const amount = random.amount()
       const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized, collaterals[1], amount, 0)
       await acl.revokePermission(authorized, marketMaker.address, CONTROLLER_ROLE, { from: root })
 
@@ -992,7 +998,6 @@ contract('BancorMarketMaker app', accounts => {
     })
 
     it('reverts when data is for function other than makeBuyOrder', async () => {
-      const amount = random.amount()
       const makeBuyOrderData = marketMaker.contract.makeSellOrder.getData(authorized, collaterals[1], amount, 0)
 
       await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
@@ -1000,7 +1005,6 @@ contract('BancorMarketMaker app', accounts => {
     })
 
     it('reverts when buyer in data is not equal to from address', async () => {
-      const amount = random.amount()
       const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized2, collaterals[1], amount, 0)
 
       await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
@@ -1008,7 +1012,6 @@ contract('BancorMarketMaker app', accounts => {
     })
 
     it('reverts when collateral in data is not equal to token address', async () => {
-      const amount = random.amount()
       const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized, authorized, amount, 0)
 
       await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
@@ -1016,7 +1019,6 @@ contract('BancorMarketMaker app', accounts => {
     })
 
     it('reverts when deposit amount in data is not equal to token amount', async () => {
-      const amount = random.amount()
       const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized, collaterals[1], amount.add(1), 0)
 
       await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
