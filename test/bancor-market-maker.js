@@ -215,16 +215,12 @@ contract('BancorMarketMaker app', accounts => {
   beforeEach(async () => {
     await initialize(true)
   })
-
-  // #region deploy
   context('> #deploy', () => {
     it('> it should deploy', async () => {
       await BancorMarketMaker.new()
     })
   })
-  // #endregion
 
-  // #region initialize
   context('> #initialize', () => {
     context('> initialization parameters are correct', () => {
       it('it should initialize batched bancor market maker', async () => {
@@ -417,9 +413,7 @@ contract('BancorMarketMaker app', accounts => {
       )
     })
   })
-  // #endregion
 
-  // #region open
   context('> #open', () => {
     context('> sender has CONTROLLER_ROLE', () => {
       context('> and market making is not yet open', () => {
@@ -453,9 +447,7 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
   })
-  // #endregion
 
-  // #region addCollateralToken
   context('> #addCollateralToken', () => {
     context('> sender has CONTROLLER_ROLE', () => {
       context('> and collateral token has not yet been added', () => {
@@ -526,9 +518,7 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
   })
-  // #endregion
 
-  // #region removeCollateralToken
   context('> #removeCollateralToken', () => {
     context('> sender has CONTROLLER_ROLE', () => {
       context('> and collateral token is whitelisted', () => {
@@ -560,9 +550,7 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
   })
-  // #endregion
 
-  // #region updateCollateralToken
   context('> #updateCollateralToken', () => {
     context('> sender has CONTROLLER_ROLE', () => {
       context('> and collateral token is whitelisted', () => {
@@ -619,9 +607,7 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
   })
-  // #endregion
 
-  // #region updateBeneficiary
   context('> #updateBeneficiary', () => {
     context('> sender has CONTROLLER_ROLE', () => {
       context('> and beneficiary is valid', () => {
@@ -646,9 +632,7 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
   })
-  // #endregion
 
-  // #region updateFormula
   context('> #updateFormula', () => {
     context('> sender has CONTROLLER_ROLE', () => {
       context('> and formula is a contract', () => {
@@ -676,9 +660,7 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
   })
-  // #endregion
 
-  // #region updateFees
   context('> #updateFees', () => {
     context('> sender has CONTROLLER_ROLE', () => {
       context('> and new fees are valid', () => {
@@ -708,9 +690,7 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
   })
-  // #endregion
 
-  // #region makeBuyOrder
   context('> #makeBuyOrder', () => {
     forEach(['ETH', 'ERC20']).describe(`> %s`, round => {
       const index = round === 'ETH' ? 0 : 1
@@ -835,9 +815,7 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
   })
-  // #endregion
 
-  // #region makeSellOrder
   context('> #makeSellOrder', () => {
     // forEach(['ETH']).describe(`> %s`, round => {
       forEach(['ETH', 'ERC20']).describe(`> %s`, round => {
@@ -969,10 +947,8 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
   })
-  // #endregion
 
-  // #region makeSellOrder
-  context.only('> #makeBuyOrderRaw', () => {
+  context('> #makeBuyOrderRaw', () => {
 
     let amount
 
@@ -981,7 +957,7 @@ contract('BancorMarketMaker app', accounts => {
       await collateral.transfer(marketMaker.address, amount, { from: authorized })
     })
 
-    it('successfully calls makeBuyOrder()', async () => {
+    it('successfully calls makeBuyOrderRaw()', async () => {
       const makeBuyOrderData = marketMaker.contract.makeBuyOrder.getData(authorized, collaterals[1], amount, 0)
 
       const receipt = await marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized })
@@ -1025,6 +1001,6 @@ contract('BancorMarketMaker app', accounts => {
         "MM_DEPOSIT_NOT_AMOUNT")
     })
   })
-  // #endregion
+  
 
 })

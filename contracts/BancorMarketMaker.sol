@@ -405,7 +405,8 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
             return _msgValue == _value;
         }
 
-        bool buyerAllowanceAvailable = controller.balanceOf(_buyer, _collateral) >= _value
+        bool buyerAllowanceAvailable = !_noPreApproval
+            && controller.balanceOf(_buyer, _collateral) >= _value
             && ERC20(_collateral).allowance(_buyer, address(this)) >= _value;
 
         bool fundsAlreadyDeposited = _noPreApproval && controller.balanceOf(address(this), _collateral) >= _value;
