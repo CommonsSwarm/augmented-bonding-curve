@@ -3,7 +3,7 @@ const ACL = artifacts.require('ACL')
 const EVMScriptRegistryFactory = artifacts.require('EVMScriptRegistryFactory')
 const DAOFactory = artifacts.require('DAOFactory')
 const MiniMeToken = artifacts.require('MiniMeToken')
-const Controller = artifacts.require('AragonFundraisingControllerMock')
+const Controller = artifacts.require('MarketplaceControllerMock')
 const TokenManager = artifacts.require('TokenManager')
 const Agent = artifacts.require('Agent')
 const Formula = artifacts.require('BancorFormula')
@@ -12,10 +12,10 @@ const TokenMock = artifacts.require('TokenMock')
 
 const assertEvent = require('@aragon/test-helpers/assertEvent')
 const { assertRevert } = require('@aragon/test-helpers/assertThrow')
-const getBalance = require('@ablack/fundraising-shared-test-helpers/getBalance')(web3, TokenMock)
-const { ZERO_ADDRESS } = require('@ablack/fundraising-shared-test-helpers/constants')
-const { getEvent } = require('@ablack/fundraising-shared-test-helpers/events')
-const random = require('@ablack/fundraising-shared-test-helpers/random')
+const getBalance = require('@1hive/apps-marketplace-shared-test-helpers/getBalance')(web3, TokenMock)
+const { ZERO_ADDRESS } = require('@1hive/apps-marketplace-shared-test-helpers/constants')
+const { getEvent } = require('@1hive/apps-marketplace-shared-test-helpers/events')
+const random = require('@1hive/apps-marketplace-shared-test-helpers/random')
 
 const { hash } = require('eth-ens-namehash')
 const forEach = require('mocha-each')
@@ -36,7 +36,7 @@ const VIRTUAL_SUPPLIES = [new web3.BigNumber(Math.pow(10, 23)), new web3.BigNumb
 const VIRTUAL_BALANCES = [new web3.BigNumber(Math.pow(10, 22)), new web3.BigNumber(Math.pow(10, 20))]
 const RESERVE_RATIOS = [(PPM * 10) / 100, (PPM * 1) / 100]
 
-const { ETH } = require('@ablack/fundraising-shared-test-helpers/constants')
+const { ETH } = require('@1hive/apps-marketplace-shared-test-helpers/constants')
 
 contract('BancorMarketMaker app', accounts => {
   let factory, dao, acl, cBase, tBase, rBase, mBase, token, tokenManager, controller, reserve, formula, marketMaker,

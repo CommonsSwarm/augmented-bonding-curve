@@ -2,7 +2,7 @@
   "environments": {
     "default": {
       "registry": "0x5f6f7e8cc7346a11ca2def8f827b7a0b612c56a1",
-      "appName": "bancor-market-maker.open.aragonpm.eth",
+      "appName": "bancor-market-maker.aragonpm.eth",
       "network": "rpc"
     },
     "mainnet": {
@@ -14,16 +14,6 @@
       "registry": "0x98Df287B6C145399Aaa709692c8D308357bC085D",
       "appName": "bancor-market-maker.open.aragonpm.eth",
       "network": "rinkeby"
-    },
-    "hatch": {
-      "registry": "0x98Df287B6C145399Aaa709692c8D308357bC085D",
-      "appName": "bancor-market-maker.hatch.aragonpm.eth",
-      "network": "rinkeby"
-    },
-    "staging": {
-      "registry": "0xfe03625ea880a8cba336f9b5ad6e15b0a3b5a939",
-      "appName": "bancor-market-maker.aragonpm.eth",
-      "network": "rinkeby"
     }
   },
   "roles": [
@@ -33,5 +23,6 @@
       "params": []
     }
   ],
+  "appName": "bancor-market-maker.aragonpm.eth",
   "path": "contracts/BancorMarketMaker.sol"
 }

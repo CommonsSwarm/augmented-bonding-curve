@@ -8,8 +8,8 @@ import "@aragon/os/contracts/lib/math/SafeMath.sol";
 import "@aragon/os/contracts/lib/token/ERC20.sol";
 import "@aragon/apps-token-manager/contracts/TokenManager.sol";
 import "@aragon/apps-vault/contracts/Vault.sol";
-import "@ablack/fundraising-bancor-formula/contracts/BancorFormula.sol";
-import "../../marketplace-controller/contracts/IMarketplaceController.sol";
+import "@1hive/apps-marketplace-bancor-formula/contracts/BancorFormula.sol";
+import "@1hive/apps-marketplace-shared-interfaces/contracts/IMarketplaceController.sol";
 
 contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     using SafeERC20 for ERC20;
