@@ -209,7 +209,7 @@ contract('BancorMarketMaker app', accounts => {
 
   context('> #initialize', () => {
     context('> initialization parameters are correct', () => {
-      it('it should initialize batched bancor market maker', async () => {
+      it('it should initialize bancor market maker', async () => {
         assert.equal(await marketMaker.controller(), controller.address)
         assert.equal(await marketMaker.tokenManager(), tokenManager.address)
         assert.equal(await marketMaker.token(), token.address)
