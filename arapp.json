@@ -1,8 +1,8 @@
 {
   "environments": {
-    "default": {
+    "localhost": {
       "registry": "0x5f6f7e8cc7346a11ca2def8f827b7a0b612c56a1",
-      "appName": "marketplace-bancor-market-maker.open.aragonpm.eth",
+      "appName": "marketplace-bancor-market-maker.aragonpm.eth",
       "network": "rpc"
     },
     "mainnet": {
@@ -23,6 +23,5 @@
       "params": []
     }
   ],
-  "appName": "marketplace-bancor-market-maker.open.aragonpm.eth",
   "path": "contracts/BancorMarketMaker.sol"
 }
