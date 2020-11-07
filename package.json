@@ -13,11 +13,12 @@
     "compile": "buidler compile --force",
     "test": "buidler test --network buidlerevm",
     "test:gas": "REPORT_GAS=true buidler test --network localhost",
-    "coverage": "SOLIDITY_COVERAGE=true npm run ganache-cli:test",
+    "coverage": "buidler coverage --network coverage",
     "abi:extract": "buidler-extract --output abi/ --keys abi",
     "publish:major": "buidler publish major",
     "publish:minor": "buidler publish minor",
-    "publish:patch": "buidler publish patch"
+    "publish:patch": "buidler publish patch",
+    "publish": "yarn publish:major"
   },
   "files": [
     "/abi",
