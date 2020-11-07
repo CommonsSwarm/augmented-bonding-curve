@@ -11,6 +11,7 @@ import "@aragon/apps-vault/contracts/Vault.sol";
 import "@1hive/apps-marketplace-shared-interfaces/contracts/IBancorFormula.sol";
 import "@1hive/apps-marketplace-shared-interfaces/contracts/IMarketplaceController.sol";
 
+
 contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     using SafeERC20 for ERC20;
     using SafeMath  for uint256;
@@ -286,45 +287,6 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     }
 
     /**
-     * @dev Make a buy order
-     * @param _buyer The address of the buyer
-     * @param _collateral The address of the collateral token to be deposited
-     * @param _depositAmount The amount of collateral token to be deposited
-     * @param _minReturnAmountAfterFee The minimum amount of the returned bonded tokens
-     * @param _noPreApproval Whether or not funds should have already been transferred
-     */
-    function _makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee, bool _noPreApproval)
-        internal nonReentrant
-    {
-        require(isOpen, ERROR_NOT_OPEN);
-        require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
-        require(_collateralValueIsValid(_buyer, _collateral, _depositAmount, msg.value, _noPreApproval), ERROR_INVALID_COLLATERAL_VALUE);
-
-        // deduct fee
-        uint256 fee = _depositAmount.mul(buyFeePct).div(PCT_BASE);
-        uint256 depositAmountLessFee = _depositAmount.sub(fee);
-
-        // collect fee and collateral
-        if (fee > 0) {
-            _transfer(_buyer, beneficiary, _collateral, fee, _noPreApproval);
-        }
-        _transfer(_buyer, address(reserve), _collateral, depositAmountLessFee, _noPreApproval);
-
-        uint256 collateralSupply = token.totalSupply().add(collaterals[_collateral].virtualSupply);
-        uint256 collateralBalanceOfReserve = controller.balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
-        uint32 reserveRatio = collaterals[_collateral].reserveRatio;
-        uint256 returnAmount = formula.calculatePurchaseReturn(collateralSupply, collateralBalanceOfReserve, reserveRatio, depositAmountLessFee);
-
-        require(returnAmount >= _minReturnAmountAfterFee, ERROR_SLIPPAGE_EXCEEDS_LIMIT);
-
-        if (returnAmount > 0) {
-            tokenManager.mint(_buyer, returnAmount);
-        }
-
-        emit MakeBuyOrder(_buyer, _collateral, fee, depositAmountLessFee, returnAmount, buyFeePct);
-    }
-
-    /**
      * @notice Make a sell order worth `@tokenAmount(self.token(): address, _sellAmount)` for atleast `@tokenAmount(_collateral, _minReturnAmountAfterFee)`
      * @param _seller The address of the seller
      * @param _collateral The address of the collateral token to be returned
@@ -405,9 +367,9 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
             return _msgValue == _value;
         }
 
-        bool buyerAllowanceAvailable = !_noPreApproval
-            && controller.balanceOf(_buyer, _collateral) >= _value
-            && ERC20(_collateral).allowance(_buyer, address(this)) >= _value;
+        bool buyerAllowanceAvailable = !_noPreApproval &&
+            controller.balanceOf(_buyer, _collateral) >= _value &&
+            ERC20(_collateral).allowance(_buyer, address(this)) >= _value;
 
         bool fundsAlreadyDeposited = _noPreApproval && controller.balanceOf(address(this), _collateral) >= _value;
 
@@ -423,6 +385,45 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, AragonApp {
     }
 
     /* initialization functions */
+
+    /**
+     * @dev Make a buy order
+     * @param _buyer The address of the buyer
+     * @param _collateral The address of the collateral token to be deposited
+     * @param _depositAmount The amount of collateral token to be deposited
+     * @param _minReturnAmountAfterFee The minimum amount of the returned bonded tokens
+     * @param _noPreApproval Whether or not funds should have already been transferred
+     */
+    function _makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee, bool _noPreApproval)
+        internal nonReentrant
+    {
+        require(isOpen, ERROR_NOT_OPEN);
+        require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
+        require(_collateralValueIsValid(_buyer, _collateral, _depositAmount, msg.value, _noPreApproval), ERROR_INVALID_COLLATERAL_VALUE);
+
+        // deduct fee
+        uint256 fee = _depositAmount.mul(buyFeePct).div(PCT_BASE);
+        uint256 depositAmountLessFee = _depositAmount.sub(fee);
+
+        // collect fee and collateral
+        if (fee > 0) {
+            _transfer(_buyer, beneficiary, _collateral, fee, _noPreApproval);
+        }
+        _transfer(_buyer, address(reserve), _collateral, depositAmountLessFee, _noPreApproval);
+
+        uint256 collateralSupply = token.totalSupply().add(collaterals[_collateral].virtualSupply);
+        uint256 collateralBalanceOfReserve = controller.balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
+        uint32 reserveRatio = collaterals[_collateral].reserveRatio;
+        uint256 returnAmount = formula.calculatePurchaseReturn(collateralSupply, collateralBalanceOfReserve, reserveRatio, depositAmountLessFee);
+
+        require(returnAmount >= _minReturnAmountAfterFee, ERROR_SLIPPAGE_EXCEEDS_LIMIT);
+
+        if (returnAmount > 0) {
+            tokenManager.mint(_buyer, returnAmount);
+        }
+
+        emit MakeBuyOrder(_buyer, _collateral, fee, depositAmountLessFee, returnAmount, buyFeePct);
+    }
 
     /* state modifiying functions */
 
