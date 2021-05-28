@@ -1,4 +1,12 @@
 {
   "name": "Bancor Market Maker",
-  "description": "Automated market-maker batching orders filled through the BancorFormula"
+  "author": "Aragon Black and Commons Swarm",
+  "description": "Automated market-maker making orders filled through the BancorFormula",
+  "source_url": "https://github.com/commonsswarm/bancor-market-maker",
+  "icons": [
+    {
+      "src": "/meta/icon.svg",
+      "sizes": "192x192"
+    }
+  ]
 }

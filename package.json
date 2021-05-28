@@ -1,5 +1,5 @@
 {
-  "name": "@1hive/apps-marketplace-bancor-market-maker",
+  "name": "@commonsswarm/bancor-market-maker",
   "version": "1.0.0",
   "author": "Aragon Assocation <legal@aragon.org>",
   "contributors": [
@@ -7,9 +7,9 @@
     "Billy Rennekamp <billy@bin.am>"
   ],
   "license": "(GPL-3.0-or-later OR AGPL-3.0-or-later)",
-  "homepage": "https://github.com/1Hive/marketplace-app",
+  "homepage": "https://github.com/commonsswarm/bancor-market_maker",
   "scripts": {
-    "lint": "solium --dir ./contracts --config ../../.soliumrc.json",
+    "lint": "solium --dir ./contracts --config .soliumrc.json",
     "compile": "buidler compile --force",
     "test": "buidler test --network buidlerevm",
     "test:gas": "REPORT_GAS=true buidler test --network localhost",
@@ -28,18 +28,17 @@
     "/test"
   ],
   "dependencies": {
-    "@1hive/apps-marketplace-bancor-formula": "^1.0.0",
-    "@1hive/apps-marketplace-shared-interfaces": "^1.0.0",
+    "@ablack/fundraising-bancor-formula": "^1.0.0",
     "@aragon/apps-token-manager": "^2.1.0",
     "@aragon/apps-vault": "^4.1.0",
-    "@aragon/os": "4.4.0"
+    "@aragon/os": "4.4.0",
+    "babel-eslint": "^10.1.0"
   },
   "devDependencies": {
-    "@1hive/apps-marketplace-shared-test-helpers": "^1.0.0",
     "@aragon/apps-agent": "^2.0.0-rc.1",
-    "@aragon/minime": "^1.0.0",
     "@aragon/buidler-aragon": "^0.2.9",
     "@aragon/contract-helpers-test": "^0.1.0",
+    "@aragon/minime": "^1.0.0",
     "@nomiclabs/buidler": "^1.4.3",
     "@nomiclabs/buidler-etherscan": "^1.3.3",
     "@nomiclabs/buidler-ganache": "^1.3.3",
@@ -48,6 +47,14 @@
     "@nomiclabs/buidler-web3": "^1.3.4",
     "buidler-extract": "^1.0.0",
     "buidler-gas-reporter": "^0.1.3",
+    "eslint": "^5.13.0",
+    "eslint-config-prettier": "^6.5.0",
+    "eslint-config-standard": "^14.1.0",
+    "eslint-plugin-import": "^2.18.2",
+    "eslint-plugin-node": "^10.0.0",
+    "eslint-plugin-prettier": "^3.0.1",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1",
     "eth-ens-namehash": "^2.0.8",
     "mocha-each": "^1.2.0",
     "solidity-coverage": "^0.7.11",

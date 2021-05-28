@@ -1,5 +1,4 @@
 const MiniMeToken = artifacts.require('MiniMeToken')
-const Controller = artifacts.require('MarketplaceControllerMock')
 const TokenManager = artifacts.require('TokenManager')
 const Agent = artifacts.require('Agent')
 const Formula = artifacts.require('BancorFormula')
@@ -7,8 +6,10 @@ const BancorMarketMaker = artifacts.require('BancorMarketMaker')
 const TokenMock = artifacts.require('TokenMock')
 
 const { assertEvent, assertRevert, assertBn } = require('@aragon/contract-helpers-test/src/asserts')
-const getBalance = require('@1hive/apps-marketplace-shared-test-helpers/getBalance')(web3, TokenMock)
-const random = require('@1hive/apps-marketplace-shared-test-helpers/random')
+const getBalance = require('./helpers/getBalance')(web3, TokenMock)
+const random = require('./helpers/random')
+const assertExternalEvent = require('./helpers/assertExternalEvent')
+const forceSendETH = require('./helpers/forceSendETH')
 const { bn, bigExp } = require('@aragon/contract-helpers-test/src/numbers')
 const { injectWeb3, injectArtifacts, ZERO_ADDRESS } = require('@aragon/contract-helpers-test')
 const { newDao, installNewApp } = require('@aragon/contract-helpers-test/src/aragon-os')
@@ -21,7 +22,6 @@ const forEach = require('mocha-each')
 
 const RESERVE_ID = hash('agent.aragonpm.eth')
 const TOKEN_MANAGER_ID = hash('token-manager.aragonpm.eth')
-const CONTROLLER_ID = hash('marketplace-controller.aragonpm.eth')
 const MARKET_MAKER_ID = hash('bancor-market-maker.aragonpm.eth')
 
 const INITIAL_TOKEN_BALANCE = bigExp(10000, 18) // 10000 DAIs or ANTs
@@ -35,15 +35,32 @@ const VIRTUAL_SUPPLIES = [bigExp(1, 23), bigExp(1, 22)]
 const VIRTUAL_BALANCES = [bigExp(1, 22), bigExp(1, 20)]
 const RESERVE_RATIOS = [(PPM * 10) / 100, (PPM * 1) / 100]
 
-const { ETH } = require('@1hive/apps-marketplace-shared-test-helpers/constants')
+const ETH = ZERO_ADDRESS
 
 contract('BancorMarketMaker app', accounts => {
-  let dao, acl, cBase, tBase, rBase, mBase, token, tokenManager, controller, reserve, formula, marketMaker,
-    collateral, collaterals
-  let MINT_ROLE,
-    BURN_ROLE,
-    CONTROLLER_ROLE,
-    TRANSFER_ROLE
+  let dao,
+    acl,
+    tBase,
+    rBase,
+    mBase,
+    token,
+    tokenManager,
+    reserve,
+    formula,
+    marketMaker,
+    collateral,
+    collaterals
+  let MINT_ROLE, BURN_ROLE, TRANSFER_ROLE
+
+  let UPDATE_FORMULA_ROLE,
+    UPDATE_BENEFICIARY_ROLE,
+    UPDATE_FEES_ROLE,
+    ADD_COLLATERAL_TOKEN_ROLE,
+    REMOVE_COLLATERAL_TOKEN_ROLE,
+    UPDATE_COLLATERAL_TOKEN_ROLE,
+    OPEN_TRADING_ROLE,
+    MAKE_BUY_ORDER_ROLE,
+    MAKE_SELL_ORDER_ROLE
 
   const root = accounts[0]
   const authorized = accounts[1]
@@ -58,23 +75,65 @@ contract('BancorMarketMaker app', accounts => {
     acl = _acl
     // token
     token = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'Bond', 18, 'BON', false)
-    // market maker controller
-    controller = await Controller.at(await installNewApp(dao, CONTROLLER_ID, cBase.address, root))
     // token manager
-    tokenManager = await TokenManager.at(await installNewApp(dao, TOKEN_MANAGER_ID, tBase.address, root))
+    tokenManager = await TokenManager.at(
+      await installNewApp(dao, TOKEN_MANAGER_ID, tBase.address, root)
+    )
     // pool
     reserve = await Agent.at(await installNewApp(dao, RESERVE_ID, rBase.address, root))
     // bancor-curve
-    marketMaker = await BancorMarketMaker.at(await installNewApp(dao, MARKET_MAKER_ID, mBase.address, root))
+    marketMaker = await BancorMarketMaker.at(
+      await installNewApp(dao, MARKET_MAKER_ID, mBase.address, root)
+    )
     // permissions
-    await acl.createPermission(marketMaker.address, tokenManager.address, MINT_ROLE, root, { from: root })
-    await acl.createPermission(marketMaker.address, tokenManager.address, BURN_ROLE, root, { from: root })
-    await acl.createPermission(marketMaker.address, reserve.address, TRANSFER_ROLE, root, { from: root })
-    await acl.createPermission(authorized, marketMaker.address, CONTROLLER_ROLE, root, { from: root })
-    await acl.grantPermission(authorized2, marketMaker.address, CONTROLLER_ROLE, { from: root })
+
+    const createPermissions = async (grantee, app, roles, manager, options) => {
+      for (const role of roles) {
+        await acl.createPermission(grantee, app, role, manager, options)
+      }
+    }
+    const grantPermissions = async (grantee, app, roles, options) => {
+      for (const role of roles) {
+        await acl.grantPermission(grantee, app, role, options)
+      }
+    }
+
+    const marketMakerRoles = [
+      UPDATE_FORMULA_ROLE,
+      UPDATE_BENEFICIARY_ROLE,
+      UPDATE_FEES_ROLE,
+      ADD_COLLATERAL_TOKEN_ROLE,
+      REMOVE_COLLATERAL_TOKEN_ROLE,
+      UPDATE_COLLATERAL_TOKEN_ROLE,
+      OPEN_TRADING_ROLE,
+      MAKE_BUY_ORDER_ROLE,
+      MAKE_SELL_ORDER_ROLE,
+    ]
+
+    await acl.createPermission(marketMaker.address, tokenManager.address, MINT_ROLE, root, {
+      from: root,
+    })
+    await acl.createPermission(marketMaker.address, tokenManager.address, BURN_ROLE, root, {
+      from: root,
+    })
+    await acl.createPermission(marketMaker.address, reserve.address, TRANSFER_ROLE, root, {
+      from: root,
+    })
+    await createPermissions(authorized, marketMaker.address, marketMakerRoles, root, { from: root })
+    await grantPermissions(authorized2, marketMaker.address, marketMakerRoles, { from: root })
     // collaterals
-    collateral = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE.mul(bn(2)))
-    await collateral.transfer(authorized2, INITIAL_TOKEN_BALANCE, { from: authorized })
+    collateral = await MiniMeToken.new(
+      ZERO_ADDRESS,
+      ZERO_ADDRESS,
+      0,
+      'Collateral',
+      18,
+      'COLL',
+      true,
+      { from: authorized }
+    )
+    await collateral.generateTokens(authorized, INITIAL_TOKEN_BALANCE, { from: authorized })
+    await collateral.generateTokens(authorized2, INITIAL_TOKEN_BALANCE, { from: authorized })
     collaterals = [ETH, collateral.address]
     // allowances
     await collateral.approve(marketMaker.address, INITIAL_TOKEN_BALANCE, { from: authorized })
@@ -83,9 +142,7 @@ contract('BancorMarketMaker app', accounts => {
     await token.changeController(tokenManager.address)
     await tokenManager.initialize(token.address, true, 0)
     await reserve.initialize()
-    await controller.initialize()
     await marketMaker.initialize(
-      controller.address,
       tokenManager.address,
       formula.address,
       reserve.address,
@@ -94,15 +151,26 @@ contract('BancorMarketMaker app', accounts => {
       SELL_FEE_PERCENT
     )
     // end up initializing market maker
-    await marketMaker.addCollateralToken(ETH, VIRTUAL_SUPPLIES[0], VIRTUAL_BALANCES[0], RESERVE_RATIOS[0], { from: authorized })
-    await marketMaker.addCollateralToken(collateral.address, VIRTUAL_SUPPLIES[1], VIRTUAL_BALANCES[1], RESERVE_RATIOS[1], {
-      from: authorized
-    })
+    await marketMaker.addCollateralToken(
+      ETH,
+      VIRTUAL_SUPPLIES[0],
+      VIRTUAL_BALANCES[0],
+      RESERVE_RATIOS[0],
+      { from: authorized }
+    )
+    await marketMaker.addCollateralToken(
+      collateral.address,
+      VIRTUAL_SUPPLIES[1],
+      VIRTUAL_BALANCES[1],
+      RESERVE_RATIOS[1],
+      {
+        from: authorized,
+      }
+    )
 
     if (open) {
       await marketMaker.open({ from: authorized })
     }
-
   }
 
   const purchaseReturn = async (index, supply, balance, amount) => {
@@ -110,7 +178,12 @@ contract('BancorMarketMaker app', accounts => {
     balance = bn(balance)
     amount = bn(amount)
 
-    return formula.calculatePurchaseReturn(VIRTUAL_SUPPLIES[index].add(supply), VIRTUAL_BALANCES[index].add(balance), RESERVE_RATIOS[index], amount)
+    return formula.calculatePurchaseReturn(
+      VIRTUAL_SUPPLIES[index].add(supply),
+      VIRTUAL_BALANCES[index].add(balance),
+      RESERVE_RATIOS[index],
+      amount
+    )
   }
 
   const expectedPurchaseReturnForAmount = async (index, amount) => {
@@ -118,7 +191,9 @@ contract('BancorMarketMaker app', accounts => {
     const amountNoFee = amount.sub(fee)
 
     const supply = await token.totalSupply()
-    const balanceOfReserve = (await controller.balanceOf(reserve.address, collaterals[index])).add(amountNoFee)
+    const balanceOfReserve = (await marketMaker.balanceOf(reserve.address, collaterals[index])).add(
+      amountNoFee
+    )
     return await purchaseReturn(index, supply, balanceOfReserve, amountNoFee)
   }
 
@@ -127,12 +202,17 @@ contract('BancorMarketMaker app', accounts => {
     balance = bn(balance)
     amount = bn(amount)
 
-    return formula.calculateSaleReturn(VIRTUAL_SUPPLIES[index].add(supply), VIRTUAL_BALANCES[index].add(balance), RESERVE_RATIOS[index], amount)
+    return formula.calculateSaleReturn(
+      VIRTUAL_SUPPLIES[index].add(supply),
+      VIRTUAL_BALANCES[index].add(balance),
+      RESERVE_RATIOS[index],
+      amount
+    )
   }
 
   const expectedSaleReturnForAmount = async (index, amount) => {
     const supply = (await token.totalSupply()).sub(amount)
-    const balanceOfReserve = (await controller.balanceOf(reserve.address, collaterals[index]))
+    const balanceOfReserve = await marketMaker.balanceOf(reserve.address, collaterals[index])
     const saleReturnAmount = await saleReturn(index, supply, balanceOfReserve, amount)
 
     const fee = await sellFeeAfterExchange(index, amount)
@@ -141,7 +221,7 @@ contract('BancorMarketMaker app', accounts => {
 
   const sellFeeAfterExchange = async (index, amount) => {
     const supply = (await token.totalSupply()).sub(amount)
-    const balanceOfReserve = (await controller.balanceOf(reserve.address, collaterals[index]))
+    const balanceOfReserve = await marketMaker.balanceOf(reserve.address, collaterals[index])
     const saleReturnAmount = await saleReturn(index, supply, balanceOfReserve, amount)
 
     return computeSellFee(saleReturnAmount)
@@ -149,16 +229,12 @@ contract('BancorMarketMaker app', accounts => {
 
   const computeBuyFee = amount => {
     amount = bn(amount)
-    return amount
-      .mul(BUY_FEE_PERCENT)
-      .div(PCT_BASE)
+    return amount.mul(BUY_FEE_PERCENT).div(PCT_BASE)
   }
 
   const computeSellFee = amount => {
     amount = bn(amount)
-    return amount
-      .mul(SELL_FEE_PERCENT)
-      .div(PCT_BASE)
+    return amount.mul(SELL_FEE_PERCENT).div(PCT_BASE)
   }
 
   const getCollateralToken = async collateral => {
@@ -166,28 +242,39 @@ contract('BancorMarketMaker app', accounts => {
       '0': whitelisted,
       '1': virtualSupply,
       '2': virtualBalance,
-      '3': reserveRatio
-     } = await marketMaker.getCollateralToken(collateral)
+      '3': reserveRatio,
+    } = await marketMaker.getCollateralToken(collateral)
 
     return { whitelisted, virtualSupply, virtualBalance, reserveRatio }
   }
 
   const makeBuyOrder = async (buyer, collateral, paidAmount, minReturnAmount, opts = {}) => {
     const from = opts && opts.from ? opts.from : buyer
-    const value = collateral === ETH ? (opts && opts.value ? opts.value : paidAmount) : opts && opts.value ? opts.value : 0
-    return await marketMaker.makeBuyOrder(buyer, collateral, paidAmount, minReturnAmount, { from, value })
+    const value =
+      collateral === ETH
+        ? opts && opts.value
+          ? opts.value
+          : paidAmount
+        : opts && opts.value
+        ? opts.value
+        : 0
+    return await marketMaker.makeBuyOrder(buyer, collateral, paidAmount, minReturnAmount, {
+      from,
+      value,
+    })
   }
 
   const makeSellOrder = async (seller, collateral, paidAmount, minReturnAmount, opts = {}) => {
     const from = opts && opts.from ? opts.from : seller
-    return await marketMaker.makeSellOrder(seller, collateral, paidAmount, minReturnAmount, { from })
+    return await marketMaker.makeSellOrder(seller, collateral, paidAmount, minReturnAmount, {
+      from,
+    })
   }
 
   before(async () => {
     // formula
     formula = await Formula.new()
     // base contracts
-    cBase = await Controller.new()
     tBase = await TokenManager.new()
     rBase = await Agent.new()
     mBase = await BancorMarketMaker.new()
@@ -195,7 +282,16 @@ contract('BancorMarketMaker app', accounts => {
     TRANSFER_ROLE = await rBase.TRANSFER_ROLE()
     MINT_ROLE = await tBase.MINT_ROLE()
     BURN_ROLE = await tBase.BURN_ROLE()
-    CONTROLLER_ROLE = await mBase.CONTROLLER_ROLE()
+
+    UPDATE_FORMULA_ROLE = await mBase.UPDATE_FORMULA_ROLE()
+    UPDATE_BENEFICIARY_ROLE = await mBase.UPDATE_BENEFICIARY_ROLE()
+    UPDATE_FEES_ROLE = await mBase.UPDATE_FEES_ROLE()
+    ADD_COLLATERAL_TOKEN_ROLE = await mBase.ADD_COLLATERAL_TOKEN_ROLE()
+    REMOVE_COLLATERAL_TOKEN_ROLE = await mBase.REMOVE_COLLATERAL_TOKEN_ROLE()
+    UPDATE_COLLATERAL_TOKEN_ROLE = await mBase.UPDATE_COLLATERAL_TOKEN_ROLE()
+    OPEN_TRADING_ROLE = await mBase.OPEN_TRADING_ROLE()
+    MAKE_BUY_ORDER_ROLE = await mBase.MAKE_BUY_ORDER_ROLE()
+    MAKE_SELL_ORDER_ROLE = await mBase.MAKE_SELL_ORDER_ROLE()
   })
 
   beforeEach(async () => {
@@ -210,7 +306,6 @@ contract('BancorMarketMaker app', accounts => {
   context('> #initialize', () => {
     context('> initialization parameters are correct', () => {
       it('it should initialize bancor market maker', async () => {
-        assert.equal(await marketMaker.controller(), controller.address)
         assert.equal(await marketMaker.tokenManager(), tokenManager.address)
         assert.equal(await marketMaker.token(), token.address)
         assert.equal(await marketMaker.reserve(), reserve.address)
@@ -224,165 +319,170 @@ contract('BancorMarketMaker app', accounts => {
     context('> initialization parameters are not correct', () => {
       let uninitialized
 
-      beforeEach(async() => {
-        uninitialized = await BancorMarketMaker.at(await installNewApp(dao, MARKET_MAKER_ID, mBase.address, root))
-      })
-
-      it('it should revert [controller is not a contract]', async () => {
-        await assertRevert(() =>
-          uninitialized.initialize(
-            authorized,
-            tokenManager.address,
-            formula.address,
-            reserve.address,
-            beneficiary,
-            BUY_FEE_PERCENT,
-            SELL_FEE_PERCENT,
-            { from: root }
-          ), 'MM_CONTRACT_IS_EOA'
+      beforeEach(async () => {
+        uninitialized = await BancorMarketMaker.at(
+          await installNewApp(dao, MARKET_MAKER_ID, mBase.address, root)
         )
       })
 
       it('it should revert [token manager is not a contract]', async () => {
-        await assertRevert(() =>
-          uninitialized.initialize(
-            controller.address,
-            authorized,
-            formula.address,
-            reserve.address,
-            beneficiary,
-            BUY_FEE_PERCENT,
-            SELL_FEE_PERCENT,
-            { from: root }
-          ), 'MM_CONTRACT_IS_EOA'
+        await assertRevert(
+          () =>
+            uninitialized.initialize(
+              authorized,
+              formula.address,
+              reserve.address,
+              beneficiary,
+              BUY_FEE_PERCENT,
+              SELL_FEE_PERCENT,
+              { from: root }
+            ),
+          'MM_CONTRACT_IS_EOA'
         )
       })
 
       it('it should revert [token manager setting is invalid]', async () => {
-        const token_ = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'Bond', 18, 'BON', false)
-        const tokenManager_ = await TokenManager.at(await installNewApp(dao, TOKEN_MANAGER_ID, tBase.address, root))
+        const token_ = await MiniMeToken.new(
+          ZERO_ADDRESS,
+          ZERO_ADDRESS,
+          0,
+          'Bond',
+          18,
+          'BON',
+          false
+        )
+        const tokenManager_ = await TokenManager.at(
+          await installNewApp(dao, TOKEN_MANAGER_ID, tBase.address, root)
+        )
 
         await token_.changeController(tokenManager_.address)
         await tokenManager_.initialize(token_.address, true, 1)
 
-        await assertRevert(() =>
-          uninitialized.initialize(
-            controller.address,
-            tokenManager_.address,
-            formula.address,
-            reserve.address,
-            beneficiary,
-            BUY_FEE_PERCENT,
-            SELL_FEE_PERCENT,
-            { from: root }
-          ), 'MM_INVALID_TM_SETTING'
+        await assertRevert(
+          () =>
+            uninitialized.initialize(
+              tokenManager_.address,
+              formula.address,
+              reserve.address,
+              beneficiary,
+              BUY_FEE_PERCENT,
+              SELL_FEE_PERCENT,
+              { from: root }
+            ),
+          'MM_INVALID_TM_SETTING'
         )
       })
 
       it('it should revert [reserve is not a contract]', async () => {
-        await assertRevert(() =>
-          uninitialized.initialize(
-            controller.address,
-            tokenManager.address,
-            formula.address,
-            authorized,
-            beneficiary,
-            BUY_FEE_PERCENT,
-            SELL_FEE_PERCENT,
-            {
-              from: root
-            }
-          ), 'MM_CONTRACT_IS_EOA'
+        await assertRevert(
+          () =>
+            uninitialized.initialize(
+              tokenManager.address,
+              formula.address,
+              authorized,
+              beneficiary,
+              BUY_FEE_PERCENT,
+              SELL_FEE_PERCENT,
+              {
+                from: root,
+              }
+            ),
+          'MM_CONTRACT_IS_EOA'
         )
       })
 
       it('it should revert [formula is not a contract]', async () => {
-        await assertRevert(() =>
-          uninitialized.initialize(
-            controller.address,
-            tokenManager.address,
-            authorized,
-            reserve.address,
-            beneficiary,
-            BUY_FEE_PERCENT,
-            SELL_FEE_PERCENT,
-            {
-              from: root
-            }
-          ), 'MM_CONTRACT_IS_EOA'
+        await assertRevert(
+          () =>
+            uninitialized.initialize(
+              tokenManager.address,
+              authorized,
+              reserve.address,
+              beneficiary,
+              BUY_FEE_PERCENT,
+              SELL_FEE_PERCENT,
+              {
+                from: root,
+              }
+            ),
+          'MM_CONTRACT_IS_EOA'
         )
       })
 
       it('it should revert [beneficiary is null address]', async () => {
-        await assertRevert(() =>
-          uninitialized.initialize(
-            controller.address,
-            tokenManager.address,
-            formula.address,
-            reserve.address,
-            ZERO_ADDRESS,
-            BUY_FEE_PERCENT,
-            SELL_FEE_PERCENT,
-            {
-              from: root
-            }
-          ), 'MM_INVALID_BENEFICIARY'
+        await assertRevert(
+          () =>
+            uninitialized.initialize(
+              tokenManager.address,
+              formula.address,
+              reserve.address,
+              ZERO_ADDRESS,
+              BUY_FEE_PERCENT,
+              SELL_FEE_PERCENT,
+              {
+                from: root,
+              }
+            ),
+          'MM_INVALID_BENEFICIARY'
         )
       })
 
       it('it should revert [buy fee is not a percentage]', async () => {
-        await assertRevert(() =>
-          uninitialized.initialize(
-            controller.address,
-            tokenManager.address,
-            formula.address,
-            reserve.address,
-            beneficiary,
-            PCT_BASE,
-            SELL_FEE_PERCENT,
-            {
-              from: root
-            }
-          ), 'MM_INVALID_PERCENTAGE'
+        await assertRevert(
+          () =>
+            uninitialized.initialize(
+              tokenManager.address,
+              formula.address,
+              reserve.address,
+              beneficiary,
+              PCT_BASE,
+              SELL_FEE_PERCENT,
+              {
+                from: root,
+              }
+            ),
+          'MM_INVALID_PERCENTAGE'
         )
       })
 
       it('it should revert [sell fee is not a percentage]', async () => {
-        await assertRevert(() =>
-          uninitialized.initialize(
-            controller.address,
-            tokenManager.address,
-            formula.address,
-            reserve.address,
-            beneficiary,
-            BUY_FEE_PERCENT,
-            PCT_BASE,
-            {
-              from: root
-            }
-          ), 'MM_INVALID_PERCENTAGE'
+        await assertRevert(
+          () =>
+            uninitialized.initialize(
+              tokenManager.address,
+              formula.address,
+              reserve.address,
+              beneficiary,
+              BUY_FEE_PERCENT,
+              PCT_BASE,
+              {
+                from: root,
+              }
+            ),
+          'MM_INVALID_PERCENTAGE'
         )
       })
     })
 
     it('it should revert on re-initialization', async () => {
-      await assertRevert(() =>
-        marketMaker.initialize(
-          controller.address,
-          tokenManager.address,
-          formula.address,
-          reserve.address,
-          beneficiary,
-          BUY_FEE_PERCENT,
-          SELL_FEE_PERCENT,
-          { from: root }
-        ), 'INIT_ALREADY_INITIALIZED'
+      await assertRevert(
+        () =>
+          marketMaker.initialize(
+            tokenManager.address,
+            formula.address,
+            reserve.address,
+            beneficiary,
+            BUY_FEE_PERCENT,
+            SELL_FEE_PERCENT,
+            { from: root }
+          ),
+        'INIT_ALREADY_INITIALIZED'
       )
     })
   })
 
   context('> #open', () => {
-    context('> sender has CONTROLLER_ROLE', () => {
+    context('> sender has OPEN_TRADING_ROLE', () => {
       context('> and market making is not yet open', () => {
         beforeEach(async () => {
           await initialize(false)
@@ -404,7 +504,7 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
 
-    context('> sender does not have CONTROLLER_ROLE', () => {
+    context('> sender does not have OPEN_TRADING_ROLE', () => {
       beforeEach(async () => {
         await initialize(false)
       })
@@ -416,7 +516,7 @@ contract('BancorMarketMaker app', accounts => {
   })
 
   context('> #addCollateralToken', () => {
-    context('> sender has CONTROLLER_ROLE', () => {
+    context('> sender has ADD_COLLATERAL_TOKEN_ROLE', () => {
       context('> and collateral token has not yet been added', () => {
         context('> and collateral token is ETH or ERC20 [i.e. contract]', () => {
           context('> and reserve ratio is valid', () => {
@@ -427,9 +527,15 @@ contract('BancorMarketMaker app', accounts => {
               const virtualBalance = random.virtualBalance()
               const reserveRatio = random.reserveRatio()
 
-              const receipt = await marketMaker.addCollateralToken(unlisted.address, virtualSupply, virtualBalance, reserveRatio, {
-                from: authorized
-              })
+              const receipt = await marketMaker.addCollateralToken(
+                unlisted.address,
+                virtualSupply,
+                virtualBalance,
+                reserveRatio,
+                {
+                  from: authorized,
+                }
+              )
               const collateral = await getCollateralToken(unlisted.address)
 
               assertEvent(receipt, 'AddCollateralToken')
@@ -445,9 +551,15 @@ contract('BancorMarketMaker app', accounts => {
               const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
 
               await assertRevert(() =>
-                marketMaker.addCollateralToken(unlisted.address, random.virtualSupply(), random.virtualBalance(), PPM + 1, {
-                  from: authorized
-                })
+                marketMaker.addCollateralToken(
+                  unlisted.address,
+                  random.virtualSupply(),
+                  random.virtualBalance(),
+                  PPM + 1,
+                  {
+                    from: authorized,
+                  }
+                )
               )
             })
           })
@@ -456,9 +568,15 @@ contract('BancorMarketMaker app', accounts => {
         context('> but collateral token is not ETH or ERC20 [i.e. contract]', () => {
           it('it should revert', async () => {
             await assertRevert(() =>
-              marketMaker.addCollateralToken(authorized, random.virtualSupply(), random.virtualBalance(), random.reserveRatio(), {
-                from: authorized
-              })
+              marketMaker.addCollateralToken(
+                authorized,
+                random.virtualSupply(),
+                random.virtualBalance(),
+                random.reserveRatio(),
+                {
+                  from: authorized,
+                }
+              )
             )
           })
         })
@@ -467,30 +585,44 @@ contract('BancorMarketMaker app', accounts => {
       context('> but collateral token has already been added', () => {
         it('it should revert', async () => {
           await assertRevert(() =>
-            marketMaker.addCollateralToken(ETH, random.virtualSupply(), random.virtualBalance(), random.reserveRatio(), { from: authorized })
+            marketMaker.addCollateralToken(
+              ETH,
+              random.virtualSupply(),
+              random.virtualBalance(),
+              random.reserveRatio(),
+              { from: authorized }
+            )
           )
         })
       })
     })
 
-    context('> sender does not have CONTROLLER_ROLE', () => {
+    context('> sender does not have ADD_COLLATERAL_TOKEN_ROLE', () => {
       it('it should revert', async () => {
         const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
 
         await assertRevert(() =>
-          marketMaker.addCollateralToken(unlisted.address, random.virtualSupply(), random.virtualBalance(), random.reserveRatio(), {
-            from: unauthorized
-          })
+          marketMaker.addCollateralToken(
+            unlisted.address,
+            random.virtualSupply(),
+            random.virtualBalance(),
+            random.reserveRatio(),
+            {
+              from: unauthorized,
+            }
+          )
         )
       })
     })
   })
 
   context('> #removeCollateralToken', () => {
-    context('> sender has CONTROLLER_ROLE', () => {
+    context('> sender has REMOVE_COLLATERAL_TOKEN_ROLE', () => {
       context('> and collateral token is whitelisted', () => {
         it('it should remove collateral token', async () => {
-          const receipt = await marketMaker.removeCollateralToken(collateral.address, { from: authorized })
+          const receipt = await marketMaker.removeCollateralToken(collateral.address, {
+            from: authorized,
+          })
           const collateral_ = await getCollateralToken(collateral.address)
 
           assertEvent(receipt, 'RemoveCollateralToken')
@@ -499,27 +631,30 @@ contract('BancorMarketMaker app', accounts => {
           assertBn(collateral_.virtualBalance, 0)
           assert.equal(collateral_.reserveRatio.toNumber(), 0)
         })
-
       })
 
       context('> but collateral token is not whitelisted', () => {
         it('it should revert', async () => {
           const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
 
-          await assertRevert(() => marketMaker.removeCollateralToken(unlisted.address, { from: authorized }))
+          await assertRevert(() =>
+            marketMaker.removeCollateralToken(unlisted.address, { from: authorized })
+          )
         })
       })
     })
 
-    context('> sender does not have CONTROLLER_ROLE', () => {
+    context('> sender does not have REMOVE_COLLATERAL_TOKEN_ROLE', () => {
       it('it should revert', async () => {
-        await assertRevert(() => marketMaker.removeCollateralToken(collateral.address, { from: unauthorized }))
+        await assertRevert(() =>
+          marketMaker.removeCollateralToken(collateral.address, { from: unauthorized })
+        )
       })
     })
   })
 
   context('> #updateCollateralToken', () => {
-    context('> sender has CONTROLLER_ROLE', () => {
+    context('> sender has UPDATE_COLLATERAL_TOKEN_ROLE', () => {
       context('> and collateral token is whitelisted', () => {
         context('> and reserve ratio is valid', () => {
           it('it should update collateral token', async () => {
@@ -527,9 +662,15 @@ contract('BancorMarketMaker app', accounts => {
             const virtualBalance = random.virtualBalance()
             const reserveRatio = random.reserveRatio()
 
-            const receipt = await marketMaker.updateCollateralToken(collateral.address, virtualSupply, virtualBalance, reserveRatio, {
-              from: authorized
-            })
+            const receipt = await marketMaker.updateCollateralToken(
+              collateral.address,
+              virtualSupply,
+              virtualBalance,
+              reserveRatio,
+              {
+                from: authorized,
+              }
+            )
             const collateral_ = await getCollateralToken(collateral.address)
 
             assertEvent(receipt, 'UpdateCollateralToken')
@@ -543,9 +684,15 @@ contract('BancorMarketMaker app', accounts => {
         context('> but reserve ratio is not valid', () => {
           it('it should revert', async () => {
             await assertRevert(() =>
-              marketMaker.updateCollateralToken(collateral.address, random.virtualSupply(), random.virtualBalance(), PPM + 1, {
-                from: authorized
-              })
+              marketMaker.updateCollateralToken(
+                collateral.address,
+                random.virtualSupply(),
+                random.virtualBalance(),
+                PPM + 1,
+                {
+                  from: authorized,
+                }
+              )
             )
           })
         })
@@ -556,27 +703,39 @@ contract('BancorMarketMaker app', accounts => {
           const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
 
           await assertRevert(() =>
-            marketMaker.updateCollateralToken(unlisted.address, random.virtualSupply(), random.virtualBalance(), random.reserveRatio(), {
-              from: authorized
-            })
+            marketMaker.updateCollateralToken(
+              unlisted.address,
+              random.virtualSupply(),
+              random.virtualBalance(),
+              random.reserveRatio(),
+              {
+                from: authorized,
+              }
+            )
           )
         })
       })
     })
 
-    context('> sender does not have CONTROLLER_ROLE', () => {
+    context('> sender does not have UPDATE_COLLATERAL_TOKEN_ROLE', () => {
       it('it should revert', async () => {
         await assertRevert(() =>
-          marketMaker.updateCollateralToken(collateral.address, random.virtualSupply(), random.virtualBalance(), random.reserveRatio(), {
-            from: unauthorized
-          })
+          marketMaker.updateCollateralToken(
+            collateral.address,
+            random.virtualSupply(),
+            random.virtualBalance(),
+            random.reserveRatio(),
+            {
+              from: unauthorized,
+            }
+          )
         )
       })
     })
   })
 
   context('> #updateBeneficiary', () => {
-    context('> sender has CONTROLLER_ROLE', () => {
+    context('> sender has UPDATE_BENEFICIARY_ROLE', () => {
       context('> and beneficiary is valid', () => {
         it('it should update beneficiary', async () => {
           const receipt = await marketMaker.updateBeneficiary(root, { from: authorized })
@@ -588,12 +747,14 @@ contract('BancorMarketMaker app', accounts => {
 
       context('> but beneficiary is not valid', () => {
         it('it should revert', async () => {
-          await assertRevert(() => marketMaker.updateBeneficiary(ZERO_ADDRESS, { from: authorized }))
+          await assertRevert(() =>
+            marketMaker.updateBeneficiary(ZERO_ADDRESS, { from: authorized })
+          )
         })
       })
     })
 
-    context('> sender does not have CONTROLLER_ROLE', () => {
+    context('> sender does not have UPDATE_BENEFICIARY_ROLE', () => {
       it('it should revert', async () => {
         await assertRevert(() => marketMaker.updateBeneficiary(root, { from: unauthorized }))
       })
@@ -601,7 +762,7 @@ contract('BancorMarketMaker app', accounts => {
   })
 
   context('> #updateFormula', () => {
-    context('> sender has CONTROLLER_ROLE', () => {
+    context('> sender has UPDATE_FORMULA_ROLE', () => {
       context('> and formula is a contract', () => {
         it('it should update formula', async () => {
           const formula_ = await Formula.new()
@@ -619,17 +780,19 @@ contract('BancorMarketMaker app', accounts => {
       })
     })
 
-    context('> sender does not have CONTROLLER_ROLE', () => {
+    context('> sender does not have UPDATE_FORMULA_ROLE', () => {
       it('it should revert', async () => {
         const formula_ = await Formula.new()
 
-        await assertRevert(() => marketMaker.updateFormula(formula_.address, { from: unauthorized }))
+        await assertRevert(() =>
+          marketMaker.updateFormula(formula_.address, { from: unauthorized })
+        )
       })
     })
   })
 
   context('> #updateFees', () => {
-    context('> sender has CONTROLLER_ROLE', () => {
+    context('> sender has UPDATE_FEES_ROLE', () => {
       context('> and new fees are valid', () => {
         it('it should update fees', async () => {
           const receipt = await marketMaker.updateFees(40, 50, { from: authorized })
@@ -642,16 +805,20 @@ contract('BancorMarketMaker app', accounts => {
 
       context('> but new fees are not valid', () => {
         it('it should revert [buy fee is not valid]', async () => {
-          await assertRevert(() => marketMaker.updateFees(PCT_BASE.add(bn(1)), 50, { from: authorized }))
+          await assertRevert(() =>
+            marketMaker.updateFees(PCT_BASE.add(bn(1)), 50, { from: authorized })
+          )
         })
 
         it('it should revert [sell fee is not valid]', async () => {
-          await assertRevert(() => marketMaker.updateFees(40, PCT_BASE.add(bn(1)), { from: authorized }))
+          await assertRevert(() =>
+            marketMaker.updateFees(40, PCT_BASE.add(bn(1)), { from: authorized })
+          )
         })
       })
     })
 
-    context('> sender does not have CONTROLLER_ROLE', () => {
+    context('> sender does not have UPDATE_FEES_ROLE', () => {
       it('it should revert', async () => {
         await assertRevert(() => marketMaker.updateFees(40, 50, { from: unauthorized }))
       })
@@ -662,56 +829,89 @@ contract('BancorMarketMaker app', accounts => {
     forEach(['ETH', 'ERC20']).describe(`> %s`, round => {
       const index = round === 'ETH' ? 0 : 1
 
-      context('> sender has CONTROLLER_ROLE', () => {
+      context('> sender has MAKE_BUY_ORDER_ROLE', () => {
         context('> and market making is open', () => {
           context('> and collateral is whitelisted', () => {
             context('> and value is not zero', () => {
               context('> and sender has sufficient funds', () => {
                 context('> and no excess value is sent', () => {
-
                   it('it should make buy order', async () => {
                     const amount = random.amount()
-                    const expectedReturnAmount = await expectedPurchaseReturnForAmount(index, amount)
+                    const expectedReturnAmount = await expectedPurchaseReturnForAmount(
+                      index,
+                      amount
+                    )
                     const senderBalanceBefore = await token.balanceOf(authorized)
 
-                    const receipt = await makeBuyOrder(authorized, collaterals[index], amount, expectedReturnAmount, { from: authorized })
+                    const receipt = await makeBuyOrder(
+                      authorized,
+                      collaterals[index],
+                      amount,
+                      expectedReturnAmount,
+                      { from: authorized }
+                    )
 
                     const senderBalanceAfter = await token.balanceOf(authorized)
                     assertEvent(receipt, 'MakeBuyOrder')
-                    assert.equal(senderBalanceAfter.sub(senderBalanceBefore).toString(), expectedReturnAmount.toString())
+                    assert.equal(
+                      senderBalanceAfter.sub(senderBalanceBefore).toString(),
+                      expectedReturnAmount.toString()
+                    )
                   })
 
                   it('it should deduct fee', async () => {
-                    const beneficiaryBalanceBefore = bn(await getBalance(collaterals[index], beneficiary))
+                    const beneficiaryBalanceBefore = bn(
+                      await getBalance(collaterals[index], beneficiary)
+                    )
                     const amount = random.amount()
                     const fee = computeBuyFee(amount)
 
-                    await makeBuyOrder(authorized, collaterals[index], amount, 0, { from: authorized })
+                    await makeBuyOrder(authorized, collaterals[index], amount, 0, {
+                      from: authorized,
+                    })
 
-                    const beneficiaryBalanceAfter = bn(await getBalance(collaterals[index], beneficiary))
+                    const beneficiaryBalanceAfter = bn(
+                      await getBalance(collaterals[index], beneficiary)
+                    )
                     assertBn(beneficiaryBalanceAfter.sub(beneficiaryBalanceBefore), fee)
                   })
 
                   it('it should collect collateral', async () => {
-                    const reserveBalanceBefore = bn(await getBalance(collaterals[index], reserve.address))
+                    const reserveBalanceBefore = bn(
+                      await getBalance(collaterals[index], reserve.address)
+                    )
                     const amount = random.amount()
                     const fee = computeBuyFee(amount)
                     const amountAfterFee = amount.sub(fee)
 
-                    await makeBuyOrder(authorized, collaterals[index], amount, 0, { from: authorized })
+                    await makeBuyOrder(authorized, collaterals[index], amount, 0, {
+                      from: authorized,
+                    })
 
-                    const reserveBalanceAfter = bn(await getBalance(collaterals[index], reserve.address))
+                    const reserveBalanceAfter = bn(
+                      await getBalance(collaterals[index], reserve.address)
+                    )
                     assertBn(reserveBalanceAfter.sub(reserveBalanceBefore), amountAfterFee)
                   })
 
                   context('> but order returns less than min return amount', () => {
                     it('it should revert', async () => {
                       const amount = random.amount()
-                      const expectedReturnAmount = bn(await expectedPurchaseReturnForAmount(index, amount))
+                      const expectedReturnAmount = bn(
+                        await expectedPurchaseReturnForAmount(index, amount)
+                      )
 
-                      await assertRevert(() =>
-                        makeBuyOrder(authorized, collaterals[index], amount, expectedReturnAmount.add(bn(1)),
-                          { from: authorized }), 'MM_SLIPPAGE_EXCEEDS_LIMIT')
+                      await assertRevert(
+                        () =>
+                          makeBuyOrder(
+                            authorized,
+                            collaterals[index],
+                            amount,
+                            expectedReturnAmount.add(bn(1)),
+                            { from: authorized }
+                          ),
+                        'MM_SLIPPAGE_EXCEEDS_LIMIT'
+                      )
                     })
                   })
                 })
@@ -720,9 +920,14 @@ contract('BancorMarketMaker app', accounts => {
                   it('it should revert', async () => {
                     const amount = random.amount()
 
-                    await assertRevert(() =>
-                      makeBuyOrder(authorized, collaterals[index], amount, 0,
-                        { from: authorized, value: amount.add(bn(1)) }), 'MM_INVALID_COLLATERAL_VALUE') // should revert both for ETH and ERC20
+                    await assertRevert(
+                      () =>
+                        makeBuyOrder(authorized, collaterals[index], amount, 0, {
+                          from: authorized,
+                          value: amount.add(bn(1)),
+                        }),
+                      'MM_INVALID_COLLATERAL_VALUE'
+                    ) // should revert both for ETH and ERC20
                   })
                 })
               })
@@ -731,23 +936,30 @@ contract('BancorMarketMaker app', accounts => {
                 it('it should revert', async () => {
                   const amount = random.amount()
                   // let's burn the extra tokens to end up with a small balance
-                  await collateral.transfer(unauthorized, INITIAL_TOKEN_BALANCE.sub(amount), { from: authorized })
+                  await collateral.transfer(unauthorized, INITIAL_TOKEN_BALANCE.sub(amount), {
+                    from: authorized,
+                  })
 
-                  await assertRevert(() =>
-                    makeBuyOrder(authorized, collaterals[index], amount.add(bn(1)), 0,
-                      { from: authorized, value: amount.sub(bn(1)) }), 'MM_INVALID_COLLATERAL_VALUE') // should revert both for ETH and ERC20
+                  await assertRevert(
+                    () =>
+                      makeBuyOrder(authorized, collaterals[index], amount.add(bn(1)), 0, {
+                        from: authorized,
+                        value: amount.sub(bn(1)),
+                      }),
+                    'MM_INVALID_COLLATERAL_VALUE'
+                  ) // should revert both for ETH and ERC20
                 })
               })
             })
 
             context('> but value is zero', () => {
               it('it should revert', async () => {
-                await assertRevert(() =>
-                  makeBuyOrder(authorized, collaterals[index], 0, 0,
-                    { from: authorized }), 'MM_INVALID_COLLATERAL_VALUE')
+                await assertRevert(
+                  () => makeBuyOrder(authorized, collaterals[index], 0, 0, { from: authorized }),
+                  'MM_INVALID_COLLATERAL_VALUE'
+                )
               })
             })
-
           })
 
           context('> but collateral is not whitelisted', () => {
@@ -755,9 +967,16 @@ contract('BancorMarketMaker app', accounts => {
               // we can't test un-whitelisted ETH unless we re-deploy a DAO without ETH as a whitelisted
               // collateral just for that use case it's not worth it because the logic is the same than ERC20 anyhow
               const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
-              await unlisted.approve(marketMaker.address, INITIAL_TOKEN_BALANCE, { from: authorized })
-              await assertRevert(() => makeBuyOrder(authorized, unlisted.address, random.amount(), 0, { from: authorized }),
-                'MM_COLLATERAL_NOT_WHITELISTED')
+              await unlisted.approve(marketMaker.address, INITIAL_TOKEN_BALANCE, {
+                from: authorized,
+              })
+              await assertRevert(
+                () =>
+                  makeBuyOrder(authorized, unlisted.address, random.amount(), 0, {
+                    from: authorized,
+                  }),
+                'MM_COLLATERAL_NOT_WHITELISTED'
+              )
             })
           })
         })
@@ -768,16 +987,26 @@ contract('BancorMarketMaker app', accounts => {
           })
 
           it('it should revert', async () => {
-            await assertRevert(() => makeBuyOrder(authorized, collaterals[index], random.amount(), 0, { from: authorized }),
-              'MM_NOT_OPEN')
+            await assertRevert(
+              () =>
+                makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                  from: authorized,
+                }),
+              'MM_NOT_OPEN'
+            )
           })
         })
       })
 
-      context('> sender does not have CONTROLLER_ROLE', () => {
+      context('> sender does not have MAKE_BUY_ORDER_ROLE', () => {
         it('it should revert', async () => {
-          await assertRevert(() => makeBuyOrder(unauthorized, collaterals[index], random.amount(), 0, { from: unauthorized }),
-            'APP_AUTH_FAILED')
+          await assertRevert(
+            () =>
+              makeBuyOrder(unauthorized, collaterals[index], random.amount(), 0, {
+                from: unauthorized,
+              }),
+            'APP_AUTH_FAILED'
+          )
         })
       })
     })
@@ -785,28 +1014,44 @@ contract('BancorMarketMaker app', accounts => {
 
   context('> #makeSellOrder', () => {
     // forEach(['ETH']).describe(`> %s`, round => {
-      forEach(['ETH', 'ERC20']).describe(`> %s`, round => {
+    forEach(['ETH', 'ERC20']).describe(`> %s`, round => {
       const index = round === 'ETH' ? 0 : 1
 
-      context('> sender has CONTROLLER_ROLE', () => {
+      context('> sender has MAKE_SELL_ORDER_ROLE', () => {
         context('> and market making is open', () => {
           context('> and collateral is whitelisted', () => {
             context('> and amount is not zero', () => {
               context('> and sender has sufficient funds', () => {
                 context('> and pool has sufficient funds', () => {
                   context('> and there is one order', () => {
-
                     it('it should make sell order', async () => {
-                      await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, { from: authorized })
+                      await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                        from: authorized,
+                      })
 
-                      const collateralBalanceBefore = index === 0 ? bn(await web3.eth.getBalance(authorized)) : bn(await collateral.balanceOf(authorized))
+                      const collateralBalanceBefore =
+                        index === 0
+                          ? bn(await web3.eth.getBalance(authorized))
+                          : bn(await collateral.balanceOf(authorized))
                       const tokenBalanceBefore = await token.balanceOf(authorized)
-                      const expectedSaleReturn = await expectedSaleReturnForAmount(index, tokenBalanceBefore)
+                      const expectedSaleReturn = await expectedSaleReturnForAmount(
+                        index,
+                        tokenBalanceBefore
+                      )
 
-                      const sellReceipt = await makeSellOrder(authorized, collaterals[index], tokenBalanceBefore, expectedSaleReturn, { from: authorized2 })
+                      const sellReceipt = await makeSellOrder(
+                        authorized,
+                        collaterals[index],
+                        tokenBalanceBefore,
+                        expectedSaleReturn,
+                        { from: authorized2 }
+                      )
 
                       const tokenBalanceAfter = await token.balanceOf(authorized)
-                      const collateralBalanceAfter = index === 0 ? bn(await web3.eth.getBalance(authorized)) : bn(await collateral.balanceOf(authorized))
+                      const collateralBalanceAfter =
+                        index === 0
+                          ? bn(await web3.eth.getBalance(authorized))
+                          : bn(await collateral.balanceOf(authorized))
                       const collateralReturned = collateralBalanceAfter.sub(collateralBalanceBefore)
 
                       assertEvent(sellReceipt, 'MakeSellOrder')
@@ -816,17 +1061,26 @@ contract('BancorMarketMaker app', accounts => {
                     })
 
                     it('it should collect fees', async () => {
-                      await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, { from: authorized })
+                      await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                        from: authorized,
+                      })
                       const senderBalance = await token.balanceOf(authorized)
-                      const beneficiaryBalanceBefore = index === 0 ? bn(await web3.eth.getBalance(beneficiary)) : bn(await collateral.balanceOf(beneficiary))
+                      const beneficiaryBalanceBefore =
+                        index === 0
+                          ? bn(await web3.eth.getBalance(beneficiary))
+                          : bn(await collateral.balanceOf(beneficiary))
                       const fee = await sellFeeAfterExchange(index, senderBalance)
 
-                      await makeSellOrder(authorized, collaterals[index], senderBalance, 0, { from: authorized })
+                      await makeSellOrder(authorized, collaterals[index], senderBalance, 0, {
+                        from: authorized,
+                      })
 
-                      const beneficiaryBalanceAfter = index === 0 ? bn(await web3.eth.getBalance(beneficiary)) : bn(await collateral.balanceOf(beneficiary))
+                      const beneficiaryBalanceAfter =
+                        index === 0
+                          ? bn(await web3.eth.getBalance(beneficiary))
+                          : bn(await collateral.balanceOf(beneficiary))
                       assertBn(beneficiaryBalanceAfter.sub(beneficiaryBalanceBefore), fee)
                     })
-
                   })
                 })
 
@@ -835,50 +1089,82 @@ contract('BancorMarketMaker app', accounts => {
                     const index_ = index === 1 ? 0 : 1
                     // let's add some collateral into the pool
 
-                    await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, { from: authorized })
-                    await makeBuyOrder(authorized, collaterals[index_], random.amount(), 0, { from: authorized })
+                    await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                      from: authorized,
+                    })
+                    await makeBuyOrder(authorized, collaterals[index_], random.amount(), 0, {
+                      from: authorized,
+                    })
                     const senderBalance = await token.balanceOf(authorized)
 
                     // redeem more bonds against the base collateral than it can pay for and assert it reverts
-                    await assertRevert(() => makeSellOrder(authorized, collaterals[index], senderBalance,
-                      0, { from: authorized }), index === 0 ? "VAULT_SEND_REVERTED" : "VAULT_TOKEN_TRANSFER_REVERTED")
+                    await assertRevert(
+                      () =>
+                        makeSellOrder(authorized, collaterals[index], senderBalance, 0, {
+                          from: authorized,
+                        }),
+                      index === 0 ? 'VAULT_SEND_REVERTED' : 'VAULT_TOKEN_TRANSFER_REVERTED'
+                    )
                   })
                 })
 
-
                 context('> but order returns less than minReturnAmount', () => {
                   it('it should revert', async () => {
-                    await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, { from: authorized })
+                    await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                      from: authorized,
+                    })
                     const senderBalance = await token.balanceOf(authorized)
 
-                    const expectedSaleReturn = await expectedSaleReturnForAmount(index, senderBalance)
+                    const expectedSaleReturn = await expectedSaleReturnForAmount(
+                      index,
+                      senderBalance
+                    )
 
-                    await assertRevert(() => makeSellOrder(authorized, collaterals[index], senderBalance,
-                      expectedSaleReturn.add(bn(1)), { from: authorized }), "MM_SLIPPAGE_EXCEEDS_LIMIT")
+                    await assertRevert(
+                      () =>
+                        makeSellOrder(
+                          authorized,
+                          collaterals[index],
+                          senderBalance,
+                          expectedSaleReturn.add(bn(1)),
+                          { from: authorized }
+                        ),
+                      'MM_SLIPPAGE_EXCEEDS_LIMIT'
+                    )
                   })
                 })
               })
 
               context('> but sender does not have sufficient funds', () => {
                 it('it should revert', async () => {
-                  await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, { from: authorized })
+                  await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                    from: authorized,
+                  })
                   const senderBalance = await token.balanceOf(authorized)
 
-                  await assertRevert(() => makeSellOrder(authorized, collaterals[index], senderBalance.add(bn(1)),
-                    0, { from: authorized }), "MM_INVALID_BOND_AMOUNT")
+                  await assertRevert(
+                    () =>
+                      makeSellOrder(authorized, collaterals[index], senderBalance.add(bn(1)), 0, {
+                        from: authorized,
+                      }),
+                    'MM_INVALID_BOND_AMOUNT'
+                  )
                 })
               })
             })
 
             context('> but amount is zero', () => {
               it('it should revert', async () => {
-                await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, { from: authorized })
+                await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                  from: authorized,
+                })
 
-                await assertRevert(() => makeSellOrder(authorized, collaterals[index], 0,
-                  0, { from: authorized }), "MM_INVALID_BOND_AMOUNT")
+                await assertRevert(
+                  () => makeSellOrder(authorized, collaterals[index], 0, 0, { from: authorized }),
+                  'MM_INVALID_BOND_AMOUNT'
+                )
               })
             })
-
           })
 
           context('> but collateral is not whitelisted', () => {
@@ -886,12 +1172,21 @@ contract('BancorMarketMaker app', accounts => {
               // we can't test un-whitelisted ETH unless we re-deploy a DAO without ETH as a whitelisted
               // collateral just for that use case it's not worth it because the logic is the same than ERC20 anyhow
               const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
-              await unlisted.approve(marketMaker.address, INITIAL_TOKEN_BALANCE, { from: authorized })
-              await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, { from: authorized })
+              await unlisted.approve(marketMaker.address, INITIAL_TOKEN_BALANCE, {
+                from: authorized,
+              })
+              await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                from: authorized,
+              })
               const senderBalance = await token.balanceOf(authorized)
 
-              await assertRevert(() => makeSellOrder(authorized, unlisted.address, senderBalance,
-                0, { from: authorized }), "MM_COLLATERAL_NOT_WHITELISTED")
+              await assertRevert(
+                () =>
+                  makeSellOrder(authorized, unlisted.address, senderBalance, 0, {
+                    from: authorized,
+                  }),
+                'MM_COLLATERAL_NOT_WHITELISTED'
+              )
             })
           })
         })
@@ -903,71 +1198,152 @@ contract('BancorMarketMaker app', accounts => {
         })
       })
 
-      context('> sender does not have CONTROLLER_ROLE', () => {
+      context('> sender does not have MAKE_SELL_ORDER_ROLE', () => {
         it('it should revert', async () => {
-          await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, { from: authorized })
+          await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+            from: authorized,
+          })
           const senderBalance = await token.balanceOf(authorized)
 
-          await assertRevert(() => makeSellOrder(authorized, collaterals[index], senderBalance,
-            0, { from: unauthorized }), "APP_AUTH_FAILED")
+          await assertRevert(
+            () =>
+              makeSellOrder(authorized, collaterals[index], senderBalance, 0, {
+                from: unauthorized,
+              }),
+            'APP_AUTH_FAILED'
+          )
         })
       })
     })
   })
 
-  context('> #makeBuyOrderRaw', () => {
-
+  context('> #receiveApproval', () => {
     let amount
 
     beforeEach(async () => {
       amount = random.amount()
-      await collateral.transfer(marketMaker.address, amount, { from: authorized })
+      await collateral.approve(marketMaker.address, 0, { from: authorized })
     })
 
-    it('successfully calls makeBuyOrderRaw()', async () => {
-      const makeBuyOrderData = marketMaker.contract.methods.makeBuyOrder(authorized, collaterals[1], amount, 0).encodeABI()
+    it('successfully calls approveAndCall()', async () => {
+      const makeBuyOrderData = marketMaker.contract.methods
+        .makeBuyOrder(authorized, collaterals[1], amount, 0)
+        .encodeABI()
 
-      const receipt = await marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized })
+      const receipt = await collateral.approveAndCall(
+        marketMaker.address,
+        amount,
+        makeBuyOrderData,
+        { from: authorized }
+      )
 
-      assertEvent(receipt, 'MakeBuyOrder')
+      assertExternalEvent(receipt, 'MakeBuyOrder(address,address,uint256,uint256,uint256,uint256)')
     })
 
-    it('reverts when does not have CONTROLLER_ROLE', async () => {
-      const makeBuyOrderData = marketMaker.contract.methods.makeBuyOrder(authorized, collaterals[1], amount, 0).encodeABI()
-      await acl.revokePermission(authorized, marketMaker.address, CONTROLLER_ROLE, { from: root })
-
-      await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
-        "APP_AUTH_FAILED")
+    it('reverts when does not have MAKE_BUY_ORDER_ROLE', async () => {
+      const makeBuyOrderData = marketMaker.contract.methods
+        .makeBuyOrder(authorized, collaterals[1], amount, 0)
+        .encodeABI()
+      await acl.revokePermission(authorized, marketMaker.address, MAKE_BUY_ORDER_ROLE, {
+        from: root,
+      })
+      await assertRevert(
+        collateral.approveAndCall(marketMaker.address, amount, makeBuyOrderData, {
+          from: authorized,
+        }),
+        'MM_NO_PERMISSION'
+      )
     })
 
     it('reverts when data is for function other than makeBuyOrder', async () => {
-      const makeBuyOrderData = marketMaker.contract.methods.makeSellOrder(authorized, collaterals[1], amount, 0).encodeABI()
+      const makeBuyOrderData = marketMaker.contract.methods
+        .makeSellOrder(authorized, collaterals[1], amount, 0)
+        .encodeABI()
 
-      await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
-        "MM_NOT_BUY_FUNCTION")
+      await assertRevert(
+        collateral.approveAndCall(marketMaker.address, amount, makeBuyOrderData, {
+          from: authorized,
+        }),
+        'MM_NOT_BUY_FUNCTION'
+      )
     })
 
     it('reverts when buyer in data is not equal to from address', async () => {
-      const makeBuyOrderData = marketMaker.contract.methods.makeBuyOrder(authorized2, collaterals[1], amount, 0).encodeABI()
+      const makeBuyOrderData = marketMaker.contract.methods
+        .makeBuyOrder(authorized2, collaterals[1], amount, 0)
+        .encodeABI()
 
-      await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
-        "MM_BUYER_NOT_FROM")
+      await assertRevert(
+        collateral.approveAndCall(marketMaker.address, amount, makeBuyOrderData, {
+          from: authorized,
+        }),
+        'MM_BUYER_NOT_FROM'
+      )
     })
 
     it('reverts when collateral in data is not equal to token address', async () => {
-      const makeBuyOrderData = marketMaker.contract.methods.makeBuyOrder(authorized, authorized, amount, 0).encodeABI()
+      const makeBuyOrderData = marketMaker.contract.methods
+        .makeBuyOrder(authorized, authorized, amount, 0)
+        .encodeABI()
 
-      await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
-        "MM_COLLATERAL_NOT_SENDER")
+      await assertRevert(
+        collateral.approveAndCall(marketMaker.address, amount, makeBuyOrderData, {
+          from: authorized,
+        }),
+        'MM_COLLATERAL_NOT_SENDER'
+      )
     })
 
     it('reverts when deposit amount in data is not equal to token amount', async () => {
-      const makeBuyOrderData = marketMaker.contract.methods.makeBuyOrder(authorized, collaterals[1], amount.add(bn(1)), 0).encodeABI()
+      const makeBuyOrderData = marketMaker.contract.methods
+        .makeBuyOrder(authorized, collaterals[1], amount.add(bn(1)), 0)
+        .encodeABI()
 
-      await assertRevert(marketMaker.makeBuyOrderRaw(authorized, collaterals[1], amount, makeBuyOrderData, { from: authorized }),
-        "MM_DEPOSIT_NOT_AMOUNT")
+      await assertRevert(
+        collateral.approveAndCall(marketMaker.address, amount, makeBuyOrderData, {
+          from: authorized,
+        }),
+        'MM_DEPOSIT_NOT_AMOUNT'
+      )
     })
   })
-  
 
+  context('> #balanceOf', () => {
+    context('> reserve', () => {
+      it('it should return available reserve balance [ETH] [@skip-on-coverage]', async () => {
+        // note requires running devchain/testrpc with account values more than INITIAL_COLLATERAL_BALANCE / 2
+        // using -e <Account Balances>
+        await forceSendETH(reserve.address, INITIAL_TOKEN_BALANCE.div(bn(2)))
+
+        assertBn(
+          await marketMaker.balanceOf(reserve.address, ETH),
+          INITIAL_TOKEN_BALANCE.div(bn(2))
+        )
+      })
+
+      it('it should return available reserve balance [ERC20]', async () => {
+        await collateral.transfer(reserve.address, INITIAL_TOKEN_BALANCE, { from: authorized })
+
+        assertBn(
+          await marketMaker.balanceOf(reserve.address, collateral.address),
+          INITIAL_TOKEN_BALANCE
+        )
+      })
+    })
+    context('> others', () => {
+      it('it should return balance [ETH]', async () => {
+        assertBn(
+          await marketMaker.balanceOf(authorized, ETH),
+          await web3.eth.getBalance(authorized)
+        )
+      })
+
+      it('it should return balance [ETH]', async () => {
+        assertBn(
+          await marketMaker.balanceOf(authorized, collateral.address),
+          await collateral.balanceOf(authorized)
+        )
+      })
+    })
+  })
 })

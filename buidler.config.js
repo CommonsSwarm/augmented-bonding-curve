@@ -5,8 +5,9 @@ usePlugin('@nomiclabs/buidler-solhint')
 usePlugin('buidler-gas-reporter')
 usePlugin('solidity-coverage')
 
-const ACCOUNTS = (process.env.ETH_KEYS ? process.env.ETH_KEYS.split(',') : [])
-  .map(key => key.trim())
+const ACCOUNTS = (process.env.ETH_KEYS ? process.env.ETH_KEYS.split(',') : []).map(key =>
+  key.trim()
+)
 
 module.exports = {
   defaultNetwork: 'localhost',
@@ -14,8 +15,8 @@ module.exports = {
     localhost: {
       url: 'http://localhost:8545',
       accounts: {
-        mnemonic: "explain tackle mirror kit van hammer degree position ginger unfair soup bonus"
-      }
+        mnemonic: 'explain tackle mirror kit van hammer degree position ginger unfair soup bonus',
+      },
     },
     mainnet: {
       url: 'https://mainnet.eth.aragon.network',
@@ -33,7 +34,7 @@ module.exports = {
       httpHeaders: { origin: 'buidler' },
       url: 'http://localhost:1248',
     },
-    xdai:{
+    xdai: {
       url: 'https://xdai.poanetwork.dev',
       accounts: ACCOUNTS,
       gasPrice: 20,
@@ -51,6 +52,6 @@ module.exports = {
     },
   },
   gasReporter: {
-    enabled: process.env.GAS_REPORTER ? true : false,
+    enabled: !!process.env.GAS_REPORTER,
   },
 }

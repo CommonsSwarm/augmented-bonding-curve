@@ -18,9 +18,49 @@
   },
   "roles": [
     {
-      "name": "Operate the Market Maker",
-      "id": "CONTROLLER_ROLE",
+      "name": "Update beneficiary address",
+      "id": "UPDATE_FORMULA_ROLE",
       "params": []
+    },
+    {
+      "name": "Update beneficiary address",
+      "id": "UPDATE_BENEFICIARY_ROLE",
+      "params": []
+    },
+    {
+      "name": "Update fees",
+      "id": "UPDATE_FEES_ROLE",
+      "params": []
+    },
+    {
+      "name": "Add tokens as whitelisted collaterals",
+      "id": "ADD_COLLATERAL_TOKEN_ROLE",
+      "params": []
+    },
+    {
+      "name": "Remove tokens as whitelisted collaterals",
+      "id": "REMOVE_COLLATERAL_TOKEN_ROLE",
+      "params": []
+    },
+    {
+      "name": "Update collateral tokens collateralization settings",
+      "id": "UPDATE_COLLATERAL_TOKEN_ROLE",
+      "params": []
+    },
+    {
+      "name": "Open trading",
+      "id": "OPEN_TRADING_ROLE",
+      "params": []
+    },
+    {
+      "name": "Make buy orders",
+      "id": "MAKE_BUY_ORDER_ROLE",
+      "params": ["Buyer"]
+    },
+    {
+      "name": "Make sell orders",
+      "id": "MAKE_SELL_ORDER_ROLE",
+      "params": ["Seller"]
     }
   ],
   "path": "contracts/BancorMarketMaker.sol"

@@ -7,8 +7,7 @@ import "@aragon/os/contracts/kernel/Kernel.sol";
 import "@aragon/apps-agent/contracts/Agent.sol";
 import "@aragon/minime/contracts/MiniMeToken.sol";
 import "@aragon/contract-helpers-test/contracts/0.4/token/TokenMock.sol";
-import "@1hive/apps-marketplace-shared-test-helpers/contracts/MarketplaceControllerMock.sol";
-import "@1hive/apps-marketplace-bancor-formula/contracts/BancorFormula.sol";
+import "@ablack/fundraising-bancor-formula/contracts/BancorFormula.sol";
 
 // HACK to workaround truffle artifact loading on dependencies
 contract TestImports {
