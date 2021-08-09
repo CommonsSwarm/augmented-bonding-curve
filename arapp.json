@@ -2,11 +2,11 @@
   "environments": {
     "localhost": {
       "registry": "0x5f6f7e8cc7346a11ca2def8f827b7a0b612c56a1",
-      "appName": "commons-bancor-market-maker.open.aragonpm.eth",
+      "appName": "commons-bancor-market-maker.aragonpm.eth",
       "network": "rpc"
     },
     "mainnet": {
-      "registry": "0x314159265dd8dbb310642f98f50c066173c1259b",
+      "registry": "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
       "appName": "commons-bancor-market-maker.open.aragonpm.eth",
       "network": "mainnet"
     },
@@ -14,6 +14,11 @@
       "registry": "0x98Df287B6C145399Aaa709692c8D308357bC085D",
       "appName": "commons-bancor-market-maker.open.aragonpm.eth",
       "network": "rinkeby"
+    },
+    "xdai": {
+      "registry": "0xaafca6b0c89521752e559650206d7c925fd0e530",
+      "appName": "commons-bancor-market-maker.open.aragonpm.eth",
+      "network": "xdai"
     }
   },
   "roles": [
