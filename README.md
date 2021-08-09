@@ -11,9 +11,9 @@ This module provides market liquidity to the fundraising campaign by automatical
 
 Bancor Market Maker is initialized with:
 * `_tokenManager` The address of the token manager contract
+* `_formula`      The address of the BancorFormula computation contract
 * `_reserve`      The address of the **reserve pool** contract
 * `_beneficiary`  The address of the **funding pool** contract (to whom fees are to be sent)
-* `_formula`      The address of the BancorFormula computation contract
 * `_buyFeePct`    The fee to be deducted from buy orders (in PCT_BASE)
 * `_sellFeePct`   The fee to be deducted from sell orders (in PCT_BASE)
 

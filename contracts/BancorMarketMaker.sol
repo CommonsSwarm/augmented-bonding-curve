@@ -119,9 +119,9 @@ contract BancorMarketMaker is EtherTokenConstant, IsContract, ApproveAndCallFall
     /**
      * @notice Initialize market maker
      * @param _tokenManager The address of the [bonded token] token manager contract
+     * @param _formula      The address of the BancorFormula [computation] contract
      * @param _reserve      The address of the reserve [pool] contract
      * @param _beneficiary  The address of the beneficiary [to whom fees are to be sent]
-     * @param _formula      The address of the BancorFormula [computation] contract
      * @param _buyFeePct    The fee to be deducted from buy orders [in PCT_BASE]
      * @param _sellFeePct   The fee to be deducted from sell orders [in PCT_BASE]
     */
