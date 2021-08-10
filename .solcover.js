@@ -7,9 +7,7 @@ module.exports = {
     '@aragon/apps-agent',
     '@aragon/apps-token-manager',
     '@aragon/apps-vault',
-    '@1hive/apps-marketplace-bancor-formula',
-    '@1hive/apps-marketplace-shared-interfaces',
-    '@1hive/apps-marketplace-shared-test-helpers',
+    '@ablack/fundraising-bancor-formula',
   ],
   skipFiles: [
     'test',
@@ -19,8 +17,6 @@ module.exports = {
     '@aragon/apps-agent',
     '@aragon/apps-token-manager',
     '@aragon/apps-vault',
-    '@1hive/apps-marketplace-bancor-formula',
-    '@1hive/apps-marketplace-shared-interfaces',
-    '@1hive/apps-marketplace-shared-test-helpers',
+    '@ablack/fundraising-bancor-formula',
   ],
 }

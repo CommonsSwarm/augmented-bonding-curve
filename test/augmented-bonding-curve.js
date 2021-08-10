@@ -2,7 +2,7 @@ const MiniMeToken = artifacts.require('MiniMeToken')
 const TokenManager = artifacts.require('TokenManager')
 const Agent = artifacts.require('Agent')
 const Formula = artifacts.require('BancorFormula')
-const BancorMarketMaker = artifacts.require('BancorMarketMaker')
+const AugmentedBondingCurve = artifacts.require('AugmentedBondingCurve')
 const TokenMock = artifacts.require('TokenMock')
 
 const { assertEvent, assertRevert, assertBn } = require('@aragon/contract-helpers-test/src/asserts')
@@ -22,7 +22,7 @@ const forEach = require('mocha-each')
 
 const RESERVE_ID = hash('agent.aragonpm.eth')
 const TOKEN_MANAGER_ID = hash('token-manager.aragonpm.eth')
-const MARKET_MAKER_ID = hash('bancor-market-maker.aragonpm.eth')
+const MARKET_MAKER_ID = hash('augmented-bonding-curve.aragonpm.eth')
 
 const INITIAL_TOKEN_BALANCE = bigExp(10000, 18) // 10000 DAIs or ANTs
 const PPM = 1000000
@@ -37,7 +37,7 @@ const RESERVE_RATIOS = [(PPM * 10) / 100, (PPM * 1) / 100]
 
 const ETH = ZERO_ADDRESS
 
-contract('BancorMarketMaker app', accounts => {
+contract('AugmentedBondingCurve app', accounts => {
   let dao,
     acl,
     tBase,
@@ -82,7 +82,7 @@ contract('BancorMarketMaker app', accounts => {
     // pool
     reserve = await Agent.at(await installNewApp(dao, RESERVE_ID, rBase.address, root))
     // bancor-curve
-    marketMaker = await BancorMarketMaker.at(
+    marketMaker = await AugmentedBondingCurve.at(
       await installNewApp(dao, MARKET_MAKER_ID, mBase.address, root)
     )
     // permissions
@@ -277,7 +277,7 @@ contract('BancorMarketMaker app', accounts => {
     // base contracts
     tBase = await TokenManager.new()
     rBase = await Agent.new()
-    mBase = await BancorMarketMaker.new()
+    mBase = await AugmentedBondingCurve.new()
     // constants
     TRANSFER_ROLE = await rBase.TRANSFER_ROLE()
     MINT_ROLE = await tBase.MINT_ROLE()
@@ -299,13 +299,13 @@ contract('BancorMarketMaker app', accounts => {
   })
   context('> #deploy', () => {
     it('> it should deploy', async () => {
-      await BancorMarketMaker.new()
+      await AugmentedBondingCurve.new()
     })
   })
 
   context('> #initialize', () => {
     context('> initialization parameters are correct', () => {
-      it('it should initialize bancor market maker', async () => {
+      it('it should initialize the augmented bonding curve', async () => {
         assert.equal(await marketMaker.tokenManager(), tokenManager.address)
         assert.equal(await marketMaker.token(), token.address)
         assert.equal(await marketMaker.reserve(), reserve.address)
@@ -320,7 +320,7 @@ contract('BancorMarketMaker app', accounts => {
       let uninitialized
 
       beforeEach(async () => {
-        uninitialized = await BancorMarketMaker.at(
+        uninitialized = await AugmentedBondingCurve.at(
           await installNewApp(dao, MARKET_MAKER_ID, mBase.address, root)
         )
       })

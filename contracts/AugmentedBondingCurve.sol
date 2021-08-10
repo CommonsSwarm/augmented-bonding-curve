@@ -11,7 +11,7 @@ import "@aragon/apps-vault/contracts/Vault.sol";
 import "@ablack/fundraising-bancor-formula/contracts/interfaces/IBancorFormula.sol";
 
 
-contract BancorMarketMaker is EtherTokenConstant, IsContract, ApproveAndCallFallBack, AragonApp {
+contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCallFallBack, AragonApp {
     using SafeERC20 for ERC20;
     using SafeMath  for uint256;
 

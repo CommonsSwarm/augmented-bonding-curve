@@ -1,5 +1,5 @@
 {
-  "name": "@commonsswarm/bancor-market-maker",
+  "name": "@commonsswarm/augmented-bonding-curve",
   "version": "1.0.0",
   "author": "Aragon Assocation <legal@aragon.org>",
   "contributors": [
@@ -7,7 +7,7 @@
     "Billy Rennekamp <billy@bin.am>"
   ],
   "license": "(GPL-3.0-or-later OR AGPL-3.0-or-later)",
-  "homepage": "https://github.com/commonsswarm/bancor-market_maker",
+  "homepage": "https://github.com/commonsswarm/augmented-bonding-curve",
   "scripts": {
     "lint": "solium --dir ./contracts --config .soliumrc.json",
     "compile": "buidler compile --force",
