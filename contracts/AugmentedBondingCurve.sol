@@ -301,7 +301,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     */
     function receiveApproval(address _from, uint256 _amount, address _token, bytes _buyOrderData) public {
         require(canPerform(_from, MAKE_BUY_ORDER_ROLE, new uint256[](0)), ERROR_NO_PERMISSION);
-        require(ERC20(msg.sender).transferFrom(_from, address(this), _amount), ERROR_TRANSFER_FAILED);
+        require(ERC20(msg.sender).safeTransferFrom(_from, address(this), _amount), ERROR_TRANSFER_FAILED);
 
         _makeBuyOrderRaw(_from, msg.sender, _amount, _buyOrderData);
     }
