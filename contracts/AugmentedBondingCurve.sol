@@ -60,6 +60,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     string private constant ERROR_COLLATERAL_NOT_SENDER          = "MM_COLLATERAL_NOT_SENDER";
     string private constant ERROR_DEPOSIT_NOT_AMOUNT             = "MM_DEPOSIT_NOT_AMOUNT";
     string private constant ERROR_NO_PERMISSION                  = "MM_NO_PERMISSION";
+    string private constant ERROR_TOKEN_NOT_SENDER               = "MM_TOKEN_NOT_SENDER";
 
     struct Collateral {
         bool    whitelisted;
@@ -300,6 +301,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
      *      makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
     */
     function receiveApproval(address _from, uint256 _amount, address _token, bytes _buyOrderData) public {
+        require(_token == msg.sender, ERROR_TOKEN_NOT_SENDER);
         require(canPerform(_from, MAKE_BUY_ORDER_ROLE, new uint256[](0)), ERROR_NO_PERMISSION);
         require(ERC20(msg.sender).safeTransferFrom(_from, address(this), _amount), ERROR_TRANSFER_FAILED);
 
