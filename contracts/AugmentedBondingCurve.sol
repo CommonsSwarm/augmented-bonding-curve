@@ -424,7 +424,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
      * @param _buyOrderData Data for the below function call
      *      makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
     */
-    function _makeBuyOrderRaw(address _from, address _token, uint256 _amount, bytes _buyOrderData)
+    function _makeBuyOrderRaw(address _from, address _token, uint256 _amount, bytes memory _buyOrderData)
         internal isInitialized
     {
         bytes memory buyOrderDataMemory = _buyOrderData;
