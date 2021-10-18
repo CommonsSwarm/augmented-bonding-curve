@@ -63,9 +63,9 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     string private constant ERROR_TOKEN_NOT_SENDER               = "MM_TOKEN_NOT_SENDER";
 
     struct Collateral {
-        bool    whitelisted;
         uint256 virtualSupply;
         uint256 virtualBalance;
+        bool    whitelisted;
         uint32  reserveRatio;
     }
 
