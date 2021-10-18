@@ -497,11 +497,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     }
 
     function _removeCollateralToken(address _collateral) internal {
-        Collateral storage collateral = collaterals[_collateral];
-        delete collateral.whitelisted;
-        delete collateral.virtualSupply;
-        delete collateral.virtualBalance;
-        delete collateral.reserveRatio;
+        delete collaterals[_collateral];
 
         emit RemoveCollateralToken(_collateral);
     }
