@@ -347,21 +347,13 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     function _collateralValueIsValid(address _buyer, address _collateral, uint256 _value, uint256 _msgValue, bool _noPreApproval)
         internal view returns (bool)
     {
-        if (_value == 0) {
-            return false;
-        }
-
         if (_collateral == ETH) {
             return _msgValue == _value;
         }
 
-        bool buyerAllowanceAvailable = !_noPreApproval &&
-            balanceOf(_buyer, _collateral) >= _value &&
-            ERC20(_collateral).allowance(_buyer, address(this)) >= _value;
-
         bool fundsAlreadyDeposited = _noPreApproval && balanceOf(address(this), _collateral) >= _value;
 
-        return _msgValue == 0 && (buyerAllowanceAvailable || fundsAlreadyDeposited);
+        return _msgValue == 0 && (fundsAlreadyDeposited);
     }
 
     function _bondAmountIsValid(address _seller, uint256 _amount) internal view returns (bool) {
