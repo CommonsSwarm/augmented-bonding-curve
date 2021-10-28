@@ -344,14 +344,14 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         return _tokenManager.maxAccountTokens() == uint256(-1);
     }
 
-    function _collateralValueIsValid(address _buyer, address _collateral, uint256 _value, uint256 _msgValue, bool _noPreApproval)
+    function _collateralValueIsValid(address _buyer, uint256 _value, uint256 _msgValue, bool _noPreApproval)
         internal view returns (bool)
     {
-        if (_collateral == ETH) {
+        if (msg.sender == ETH) {
             return _msgValue == _value;
         }
 
-        bool fundsAlreadyDeposited = _noPreApproval && balanceOf(address(this), _collateral) >= _value;
+        bool fundsAlreadyDeposited = _noPreApproval && balanceOf(address(this), msg.sender) >= _value;
 
         return _msgValue == 0 && (fundsAlreadyDeposited);
     }
@@ -379,7 +379,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     {
         require(isOpen, ERROR_NOT_OPEN);
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
-        require(_collateralValueIsValid(_buyer, _collateral, _depositAmount, msg.value, _noPreApproval), ERROR_INVALID_COLLATERAL_VALUE);
+        require(_collateralValueIsValid(_buyer, _depositAmount, msg.value, _noPreApproval), ERROR_INVALID_COLLATERAL_VALUE);
 
         // deduct fee
         uint256 fee = _depositAmount.mul(buyFeePct).div(PCT_BASE);
