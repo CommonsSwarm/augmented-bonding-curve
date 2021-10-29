@@ -63,9 +63,9 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     string private constant ERROR_TOKEN_NOT_SENDER               = "MM_TOKEN_NOT_SENDER";
 
     struct Collateral {
-        bool    whitelisted;
         uint256 virtualSupply;
         uint256 virtualBalance;
+        bool    whitelisted;
         uint32  reserveRatio;
     }
 
@@ -425,7 +425,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
      *      makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
     */
     function _makeBuyOrderRaw(address _from, address _token, uint256 _amount, bytes memory _buyOrderData)
-        internal isInitialized
+        internal
     {
         bytes memory buyOrderDataMemory = _buyOrderData;
 
@@ -497,11 +497,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     }
 
     function _removeCollateralToken(address _collateral) internal {
-        Collateral storage collateral = collaterals[_collateral];
-        delete collateral.whitelisted;
-        delete collateral.virtualSupply;
-        delete collateral.virtualBalance;
-        delete collateral.reserveRatio;
+        delete collaterals[_collateral];
 
         emit RemoveCollateralToken(_collateral);
     }
