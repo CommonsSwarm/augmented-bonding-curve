@@ -54,4 +54,7 @@ module.exports = {
   gasReporter: {
     enabled: !!process.env.GAS_REPORTER,
   },
+  mocha: {
+    timeout: 0
+  }
 }
