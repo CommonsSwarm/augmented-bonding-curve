@@ -1,4 +1,4 @@
-const MiniMeToken = artifacts.require('MiniMeToken')
+const MiniMeToken = artifacts.require('@aragon/minime/contracts/MiniMeToken.sol:MiniMeToken')
 const TokenManager = artifacts.require('TokenManager')
 const Agent = artifacts.require('Agent')
 const Formula = artifacts.require('BancorFormula')
@@ -6,16 +6,14 @@ const AugmentedBondingCurve = artifacts.require('AugmentedBondingCurve')
 const TokenMock = artifacts.require('TokenMock')
 const ERC20 = artifacts.require('ERC20')
 
-const { assertEvent, assertRevert, assertBn } = require('@aragon/contract-helpers-test/src/asserts')
+const { assertEvent, assertBn } = require('@aragon/contract-helpers-test/src/asserts')
 const getBalance = require('./helpers/getBalance')(web3, TokenMock)
 const random = require('./helpers/random')
 const assertExternalEvent = require('./helpers/assertExternalEvent')
 const { bn, bigExp } = require('@aragon/contract-helpers-test/src/numbers')
-const { injectWeb3, injectArtifacts, ZERO_ADDRESS } = require('@aragon/contract-helpers-test')
+const { ZERO_ADDRESS } = require('@aragon/contract-helpers-test')
 const { newDao, installNewApp } = require('@aragon/contract-helpers-test/src/aragon-os')
-
-injectWeb3(web3)
-injectArtifacts(artifacts)
+const { assertRevert } = require('./helpers/assertThrow')
 
 const { hash } = require('eth-ens-namehash')
 const forEach = require('mocha-each')
@@ -43,7 +41,7 @@ const balanceOf = async (who, token) => {
   )
 }
 
-contract('AugmentedBondingCurve app', accounts => {
+contract('AugmentedBondingCurve app', (accounts) => {
   let dao,
     acl,
     tBase,
@@ -217,22 +215,22 @@ contract('AugmentedBondingCurve app', accounts => {
     return computeSellFee(saleReturnAmount)
   }
 
-  const computeBuyFee = amount => {
+  const computeBuyFee = (amount) => {
     amount = bn(amount)
     return amount.mul(BUY_FEE_PERCENT).div(PCT_BASE)
   }
 
-  const computeSellFee = amount => {
+  const computeSellFee = (amount) => {
     amount = bn(amount)
     return amount.mul(SELL_FEE_PERCENT).div(PCT_BASE)
   }
 
-  const getCollateralToken = async collateral => {
+  const getCollateralToken = async (collateral) => {
     const {
-      '0': whitelisted,
-      '1': virtualSupply,
-      '2': virtualBalance,
-      '3': reserveRatio,
+      0: whitelisted,
+      1: virtualSupply,
+      2: virtualBalance,
+      3: reserveRatio,
     } = await marketMaker.getCollateralToken(collateral)
 
     return { whitelisted, virtualSupply, virtualBalance, reserveRatio }
@@ -805,7 +803,7 @@ contract('AugmentedBondingCurve app', accounts => {
   })
 
   context('> #makeBuyOrder', () => {
-    forEach(['ETH', 'ERC20']).describe(`> %s`, round => {
+    forEach(['ETH', 'ERC20']).describe(`> %s`, (round) => {
       const index = round === 'ETH' ? 0 : 1
 
       context('> sender has MAKE_BUY_ORDER_ROLE', () => {
@@ -971,7 +969,7 @@ contract('AugmentedBondingCurve app', accounts => {
   })
 
   context('> #makeSellOrder', () => {
-    forEach(['ETH', 'ERC20']).describe(`> %s`, round => {
+    forEach(['ETH', 'ERC20']).describe(`> %s`, (round) => {
       const index = round === 'ETH' ? 0 : 1
 
       context('> sender has MAKE_SELL_ORDER_ROLE', () => {

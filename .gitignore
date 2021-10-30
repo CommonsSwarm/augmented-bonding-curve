@@ -1,16 +1,28 @@
 # Dependencies
 node_modules
 
-# Build dirs
-.cache/
-build/
-dist/
+# coverage
+/coverage
+/coverageEnv
+/coverage.json
 
-.DS_Store
-package-lock.json
-yarn.lock
-yarn-error.log
-artifacts
+
+# build dir
+abi
+dist
 cache
-coverage
-coverage.json
+artifacts
+
+# yarn, npm
+yarn-error.log
+package-lock.json
+yarn-error.log
+
+# Misc
+.DS_Store
+.cache
+.env
+
+public/artifact.json
+public/manifest.json
+public/code.sol
