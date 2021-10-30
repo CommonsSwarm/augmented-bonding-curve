@@ -15,6 +15,8 @@
   },
   "plugins": ["prettier"],
   "rules": {
+    "no-undef": "off",
+    "camelcase": "off",
     "valid-jsdoc": "error",
     "react/prop-types": 0,
     "prettier/prettier": [
@@ -24,7 +26,6 @@
         "semi": false,
         "trailingComma": "es5",
         "bracketSpacing": true,
-        "jsxBracketSameLine": false,
         "printWidth": 100,
         "tabSize": 2
       }
