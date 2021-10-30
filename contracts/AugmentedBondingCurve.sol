@@ -521,7 +521,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
 
     function _transfer(address _from, address _to, address _collateralToken, uint256 _amount, bool _noPreApproval) internal {
         if (_collateralToken == ETH) {
-            _to.transfer(_amount);
+            _to.call.value(_amount);
         } else if (_noPreApproval) {
             require(ERC20(_collateralToken).transfer(_to, _amount), ERROR_TRANSFER_FAILED);
         } else {
