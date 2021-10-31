@@ -1,14 +1,15 @@
 pragma solidity 0.4.24;
 
-import "@aragon/os/contracts/apps/AragonApp.sol";
-import "@aragon/os/contracts/common/EtherTokenConstant.sol";
-import "@aragon/os/contracts/common/IsContract.sol";
-import "@aragon/os/contracts/common/SafeERC20.sol";
-import "@aragon/os/contracts/lib/math/SafeMath.sol";
-import "@aragon/os/contracts/lib/token/ERC20.sol";
-import "@aragon/apps-token-manager/contracts/TokenManager.sol";
-import "@aragon/apps-vault/contracts/Vault.sol";
-import "@ablack/fundraising-bancor-formula/contracts/interfaces/IBancorFormula.sol";
+import { AragonApp } from "@aragon/os/contracts/apps/AragonApp.sol";
+import { EtherTokenConstant } from "@aragon/os/contracts/common/EtherTokenConstant.sol";
+import { IsContract } from "@aragon/os/contracts/common/IsContract.sol";
+import { SafeERC20 } from "@aragon/os/contracts/common/SafeERC20.sol";
+import { SafeMath } from "@aragon/os/contracts/lib/math/SafeMath.sol";
+import { ERC20} from "@aragon/os/contracts/lib/token/ERC20.sol";
+import { TokenManager } from "@aragon/apps-token-manager/contracts/TokenManager.sol";
+import { Vault } from "@aragon/apps-vault/contracts/Vault.sol";
+import { IBancorFormula } from "@ablack/fundraising-bancor-formula/contracts/interfaces/IBancorFormula.sol";
+import { ApproveAndCallFallBack } from "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 
 
 contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCallFallBack, AragonApp {
