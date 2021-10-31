@@ -250,8 +250,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
         require(_bondAmountIsValid(_seller, _sellAmount), ERROR_INVALID_BOND_AMOUNT);
 
-        tokenManager.burn(_seller, _sellAmount);
-
         uint256 collateralSupply = token.totalSupply().add(collaterals[_collateral].virtualSupply);
         uint256 collateralBalanceOfReserve = _balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
         uint32 reserveRatio = collaterals[_collateral].reserveRatio;
@@ -261,6 +259,8 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         uint256 returnAmountLessFee = returnAmount.sub(fee);
 
         require(returnAmountLessFee >= _minReturnAmountAfterFee, ERROR_SLIPPAGE_EXCEEDS_LIMIT);
+
+        tokenManager.burn(_seller, _sellAmount);
 
         if (returnAmountLessFee > 0) {
             reserve.transfer(_collateral, _seller, returnAmountLessFee);
