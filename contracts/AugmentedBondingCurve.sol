@@ -347,7 +347,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         return _tokenManager.maxAccountTokens() == uint256(-1);
     }
 
-    function _collateralValueIsValid(address _buyer, address _collateral, uint256 _value, bool _noPreApproval)
+    function _collateralValueIsValid(address _collateral, uint256 _value)
         internal view returns (bool)
     {
         if (_value == 0) {
@@ -358,13 +358,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
             return msg.value == _value;
         }
 
-        bool buyerAllowanceAvailable = !_noPreApproval &&
-            balanceOf(_buyer, _collateral) >= _value &&
-            ERC20(_collateral).allowance(_buyer, address(this)) >= _value;
-
-        bool fundsAlreadyDeposited = _noPreApproval && balanceOf(address(this), _collateral) >= _value;
-
-        return msg.value == 0 && (buyerAllowanceAvailable || fundsAlreadyDeposited);
+        return msg.value == 0;
     }
 
     function _bondAmountIsValid(address _seller, uint256 _amount) internal view returns (bool) {
@@ -390,7 +384,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     {
         require(isOpen, ERROR_NOT_OPEN);
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
-        require(_collateralValueIsValid(_buyer, _collateral, _depositAmount, _noPreApproval), ERROR_INVALID_COLLATERAL_VALUE);
+        require(_collateralValueIsValid(_collateral, _depositAmount), ERROR_INVALID_COLLATERAL_VALUE);
 
         // deduct fee
         uint256 fee = _depositAmount.mul(buyFeePct).div(PCT_BASE);
@@ -522,7 +516,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         if (_collateralToken == ETH) {
             _to.transfer(_amount);
         } else if (_noPreApproval) {
-            require(ERC20(_collateralToken).transfer(_to, _amount), ERROR_TRANSFER_FAILED);
+            require(ERC20(_collateralToken).safeTransfer(_to, _amount), ERROR_TRANSFER_FAILED);
         } else {
             require(ERC20(_collateralToken).safeTransferFrom(_from, _to, _amount), ERROR_TRANSFER_FROM_FAILED);
         }
