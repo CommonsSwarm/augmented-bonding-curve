@@ -211,7 +211,7 @@ contract('AugmentedBondingCurve app', accounts => {
   }
 
   const expectedSaleReturnForAmount = async (index, amount) => {
-    const supply = (await token.totalSupply()).sub(amount)
+    const supply = await token.totalSupply()
     const balanceOfReserve = await marketMaker.balanceOf(reserve.address, collaterals[index])
     const saleReturnAmount = await saleReturn(index, supply, balanceOfReserve, amount)
 
@@ -220,7 +220,7 @@ contract('AugmentedBondingCurve app', accounts => {
   }
 
   const sellFeeAfterExchange = async (index, amount) => {
-    const supply = (await token.totalSupply()).sub(amount)
+    const supply = await token.totalSupply()
     const balanceOfReserve = await marketMaker.balanceOf(reserve.address, collaterals[index])
     const saleReturnAmount = await saleReturn(index, supply, balanceOfReserve, amount)
 
@@ -1025,7 +1025,7 @@ contract('AugmentedBondingCurve app', accounts => {
                 context('> and pool has sufficient funds', () => {
                   context('> and there is one order', () => {
                     it('it should make sell order', async () => {
-                      await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                      await makeBuyOrder(authorized, collaterals[index], bigExp(10, 18), 0, {
                         from: authorized,
                       })
 
