@@ -206,7 +206,7 @@ contract('AugmentedBondingCurve app', accounts => {
   }
 
   const expectedSaleReturnForAmount = async (index, amount) => {
-    const supply = (await token.totalSupply()).sub(amount)
+    const supply = await token.totalSupply()
     const balanceOfReserve = await balanceOf(reserve.address, collaterals[index])
     const saleReturnAmount = await saleReturn(index, supply, balanceOfReserve, amount)
 
@@ -215,7 +215,7 @@ contract('AugmentedBondingCurve app', accounts => {
   }
 
   const sellFeeAfterExchange = async (index, amount) => {
-    const supply = (await token.totalSupply()).sub(amount)
+    const supply = await token.totalSupply()
     const balanceOfReserve = await balanceOf(reserve.address, collaterals[index])
     const saleReturnAmount = await saleReturn(index, supply, balanceOfReserve, amount)
 
