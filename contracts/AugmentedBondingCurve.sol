@@ -11,7 +11,6 @@ import { Vault } from "@aragon/apps-vault/contracts/Vault.sol";
 import { IBancorFormula } from "@ablack/fundraising-bancor-formula/contracts/interfaces/IBancorFormula.sol";
 import { ApproveAndCallFallBack } from "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 
-
 contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCallFallBack, AragonApp {
     using SafeERC20 for ERC20;
     using SafeMath  for uint256;
@@ -62,6 +61,9 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     string private constant ERROR_DEPOSIT_NOT_AMOUNT             = "MM_DEPOSIT_NOT_AMOUNT";
     string private constant ERROR_NO_PERMISSION                  = "MM_NO_PERMISSION";
     string private constant ERROR_TOKEN_NOT_SENDER               = "MM_TOKEN_NOT_SENDER";
+    string private constant ERROR_INVALID_BUY_ORDER_DATA         = "MM_INVALID_BUY_ORDER_DATA";
+
+    uint256 private constant EXPECTED_BUY_ORDER_DATA_LEN = 132; // 4 + 32 + 32 + 32 + 32 = bytes needed to encode makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
 
     struct Collateral {
         uint256 virtualSupply;
@@ -422,7 +424,8 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     function _makeBuyOrderRaw(address _from, address _token, uint256 _amount, bytes memory _buyOrderData)
         internal
     {
-        bytes memory buyOrderDataMemory = _buyOrderData;
+        require(_buyOrderData.length == EXPECTED_BUY_ORDER_DATA_LEN, ERROR_INVALID_BUY_ORDER_DATA);
+        bytes memory buyOrderDataCopy = _buyOrderData;
 
         bytes4 functionSig;
         address buyerAddress;
@@ -432,19 +435,19 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
 
         assembly {
             // functionSigByteLocation: 32 (bytes array length)
-            functionSig := mload(add(buyOrderDataMemory, 32))
+            functionSig := mload(add(buyOrderDataCopy, 32))
 
             // buyerAddressByteLocation: 32 + 4 = 36 (bytes array length + sig)
-            buyerAddress := mload(add(buyOrderDataMemory, 36))
+            buyerAddress := mload(add(buyOrderDataCopy, 36))
 
             // collateralAddressByteLocation: 32 + 4 + 32 = 68 (bytes array length + sig + address _buyer)
-            collateralTokenAddress := mload(add(buyOrderDataMemory, 68))
+            collateralTokenAddress := mload(add(buyOrderDataCopy, 68))
 
             // depositAmountByteLocation: 32 + 4 + 32 + 32 = 100 (bytes array length + sig + address _buyer + address _collateral)
-            depositAmount := mload(add(buyOrderDataMemory, 100))
+            depositAmount := mload(add(buyOrderDataCopy, 100))
 
             // minReturnAmountAfterFeeByteLocation: 32 + 4 + 32 + 32 + 32 = 132 (bytes array length + sig + address _buyer + address _collateral + uint256 _depositAmount)
-            minReturnAmountAfterFee := mload(add(buyOrderDataMemory, 132))
+            minReturnAmountAfterFee := mload(add(buyOrderDataCopy, 132))
         }
 
         require(functionSig == this.makeBuyOrder.selector, ERROR_NOT_BUY_FUNCTION);
