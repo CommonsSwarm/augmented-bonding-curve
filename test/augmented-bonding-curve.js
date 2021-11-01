@@ -4,6 +4,7 @@ const Agent = artifacts.require('Agent')
 const Formula = artifacts.require('BancorFormula')
 const AugmentedBondingCurve = artifacts.require('AugmentedBondingCurve')
 const TokenMock = artifacts.require('TokenMock')
+const ERC20 = artifacts.require('ERC20')
 
 const { assertEvent, assertRevert, assertBn } = require('@aragon/contract-helpers-test/src/asserts')
 const getBalance = require('./helpers/getBalance')(web3, TokenMock)
@@ -37,6 +38,10 @@ const RESERVE_RATIOS = [(PPM * 10) / 100, (PPM * 1) / 100]
 
 const ETH = ZERO_ADDRESS
 
+const balanceOf = async (who, token) => {
+  return token === ETH ? web3.eth.getBalance(who) : (await ERC20.at(token)).balanceOf(who)
+}
+
 contract('AugmentedBondingCurve app', accounts => {
   let dao,
     acl,
@@ -55,9 +60,7 @@ contract('AugmentedBondingCurve app', accounts => {
   let UPDATE_FORMULA_ROLE,
     UPDATE_BENEFICIARY_ROLE,
     UPDATE_FEES_ROLE,
-    ADD_COLLATERAL_TOKEN_ROLE,
-    REMOVE_COLLATERAL_TOKEN_ROLE,
-    UPDATE_COLLATERAL_TOKEN_ROLE,
+    MANAGE_COLLATERAL_TOKEN_ROLE,
     OPEN_TRADING_ROLE,
     MAKE_BUY_ORDER_ROLE,
     MAKE_SELL_ORDER_ROLE
@@ -102,9 +105,7 @@ contract('AugmentedBondingCurve app', accounts => {
       UPDATE_FORMULA_ROLE,
       UPDATE_BENEFICIARY_ROLE,
       UPDATE_FEES_ROLE,
-      ADD_COLLATERAL_TOKEN_ROLE,
-      REMOVE_COLLATERAL_TOKEN_ROLE,
-      UPDATE_COLLATERAL_TOKEN_ROLE,
+      MANAGE_COLLATERAL_TOKEN_ROLE,
       OPEN_TRADING_ROLE,
       MAKE_BUY_ORDER_ROLE,
       MAKE_SELL_ORDER_ROLE,
@@ -191,7 +192,7 @@ contract('AugmentedBondingCurve app', accounts => {
     const amountNoFee = amount.sub(fee)
 
     const supply = await token.totalSupply()
-    const balanceOfReserve = (await marketMaker.balanceOf(reserve.address, collaterals[index])).add(
+    const balanceOfReserve = bn(await balanceOf(reserve.address, collaterals[index])).add(
       amountNoFee
     )
     return await purchaseReturn(index, supply, balanceOfReserve, amountNoFee)
@@ -212,7 +213,7 @@ contract('AugmentedBondingCurve app', accounts => {
 
   const expectedSaleReturnForAmount = async (index, amount) => {
     const supply = (await token.totalSupply()).sub(amount)
-    const balanceOfReserve = await marketMaker.balanceOf(reserve.address, collaterals[index])
+    const balanceOfReserve = await balanceOf(reserve.address, collaterals[index])
     const saleReturnAmount = await saleReturn(index, supply, balanceOfReserve, amount)
 
     const fee = await sellFeeAfterExchange(index, amount)
@@ -221,7 +222,7 @@ contract('AugmentedBondingCurve app', accounts => {
 
   const sellFeeAfterExchange = async (index, amount) => {
     const supply = (await token.totalSupply()).sub(amount)
-    const balanceOfReserve = await marketMaker.balanceOf(reserve.address, collaterals[index])
+    const balanceOfReserve = await balanceOf(reserve.address, collaterals[index])
     const saleReturnAmount = await saleReturn(index, supply, balanceOfReserve, amount)
 
     return computeSellFee(saleReturnAmount)
@@ -286,9 +287,7 @@ contract('AugmentedBondingCurve app', accounts => {
     UPDATE_FORMULA_ROLE = await mBase.UPDATE_FORMULA_ROLE()
     UPDATE_BENEFICIARY_ROLE = await mBase.UPDATE_BENEFICIARY_ROLE()
     UPDATE_FEES_ROLE = await mBase.UPDATE_FEES_ROLE()
-    ADD_COLLATERAL_TOKEN_ROLE = await mBase.ADD_COLLATERAL_TOKEN_ROLE()
-    REMOVE_COLLATERAL_TOKEN_ROLE = await mBase.REMOVE_COLLATERAL_TOKEN_ROLE()
-    UPDATE_COLLATERAL_TOKEN_ROLE = await mBase.UPDATE_COLLATERAL_TOKEN_ROLE()
+    MANAGE_COLLATERAL_TOKEN_ROLE = await mBase.MANAGE_COLLATERAL_TOKEN_ROLE()
     OPEN_TRADING_ROLE = await mBase.OPEN_TRADING_ROLE()
     MAKE_BUY_ORDER_ROLE = await mBase.MAKE_BUY_ORDER_ROLE()
     MAKE_SELL_ORDER_ROLE = await mBase.MAKE_SELL_ORDER_ROLE()
@@ -516,7 +515,7 @@ contract('AugmentedBondingCurve app', accounts => {
   })
 
   context('> #addCollateralToken', () => {
-    context('> sender has ADD_COLLATERAL_TOKEN_ROLE', () => {
+    context('> sender has MANAGE_COLLATERAL_TOKEN_ROLE', () => {
       context('> and collateral token has not yet been added', () => {
         context('> and collateral token is ETH or ERC20 [i.e. contract]', () => {
           context('> and reserve ratio is valid', () => {
@@ -597,7 +596,7 @@ contract('AugmentedBondingCurve app', accounts => {
       })
     })
 
-    context('> sender does not have ADD_COLLATERAL_TOKEN_ROLE', () => {
+    context('> sender does not have MANAGE_COLLATERAL_TOKEN_ROLE', () => {
       it('it should revert', async () => {
         const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
 
@@ -617,7 +616,7 @@ contract('AugmentedBondingCurve app', accounts => {
   })
 
   context('> #removeCollateralToken', () => {
-    context('> sender has REMOVE_COLLATERAL_TOKEN_ROLE', () => {
+    context('> sender has MANAGE_COLLATERAL_TOKEN_ROLE', () => {
       context('> and collateral token is whitelisted', () => {
         it('it should remove collateral token', async () => {
           const receipt = await marketMaker.removeCollateralToken(collateral.address, {
@@ -644,7 +643,7 @@ contract('AugmentedBondingCurve app', accounts => {
       })
     })
 
-    context('> sender does not have REMOVE_COLLATERAL_TOKEN_ROLE', () => {
+    context('> sender does not have MANAGE_COLLATERAL_TOKEN_ROLE', () => {
       it('it should revert', async () => {
         await assertRevert(() =>
           marketMaker.removeCollateralToken(collateral.address, { from: unauthorized })
@@ -654,7 +653,7 @@ contract('AugmentedBondingCurve app', accounts => {
   })
 
   context('> #updateCollateralToken', () => {
-    context('> sender has UPDATE_COLLATERAL_TOKEN_ROLE', () => {
+    context('> sender has MANAGE_COLLATERAL_TOKEN_ROLE', () => {
       context('> and collateral token is whitelisted', () => {
         context('> and reserve ratio is valid', () => {
           it('it should update collateral token', async () => {
@@ -717,7 +716,7 @@ contract('AugmentedBondingCurve app', accounts => {
       })
     })
 
-    context('> sender does not have UPDATE_COLLATERAL_TOKEN_ROLE', () => {
+    context('> sender does not have MANAGE_COLLATERAL_TOKEN_ROLE', () => {
       it('it should revert', async () => {
         await assertRevert(() =>
           marketMaker.updateCollateralToken(
@@ -1305,45 +1304,6 @@ contract('AugmentedBondingCurve app', accounts => {
         }),
         'MM_DEPOSIT_NOT_AMOUNT'
       )
-    })
-  })
-
-  context('> #balanceOf', () => {
-    context('> reserve', () => {
-      it('it should return available reserve balance [ETH] [@skip-on-coverage]', async () => {
-        // note requires running devchain/testrpc with account values more than INITIAL_COLLATERAL_BALANCE / 2
-        // using -e <Account Balances>
-        await forceSendETH(reserve.address, INITIAL_TOKEN_BALANCE.div(bn(2)))
-
-        assertBn(
-          await marketMaker.balanceOf(reserve.address, ETH),
-          INITIAL_TOKEN_BALANCE.div(bn(2))
-        )
-      })
-
-      it('it should return available reserve balance [ERC20]', async () => {
-        await collateral.transfer(reserve.address, INITIAL_TOKEN_BALANCE, { from: authorized })
-
-        assertBn(
-          await marketMaker.balanceOf(reserve.address, collateral.address),
-          INITIAL_TOKEN_BALANCE
-        )
-      })
-    })
-    context('> others', () => {
-      it('it should return balance [ETH]', async () => {
-        assertBn(
-          await marketMaker.balanceOf(authorized, ETH),
-          await web3.eth.getBalance(authorized)
-        )
-      })
-
-      it('it should return balance [ETH]', async () => {
-        assertBn(
-          await marketMaker.balanceOf(authorized, collateral.address),
-          await collateral.balanceOf(authorized)
-        )
-      })
     })
   })
 })
