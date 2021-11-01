@@ -43,11 +43,6 @@
       "params": []
     },
     {
-      "name": "Open trading",
-      "id": "OPEN_TRADING_ROLE",
-      "params": []
-    },
-    {
       "name": "Make buy orders",
       "id": "MAKE_BUY_ORDER_ROLE",
       "params": ["Buyer"]

@@ -61,7 +61,6 @@ contract('AugmentedBondingCurve app', accounts => {
     UPDATE_BENEFICIARY_ROLE,
     UPDATE_FEES_ROLE,
     MANAGE_COLLATERAL_TOKEN_ROLE,
-    OPEN_TRADING_ROLE,
     MAKE_BUY_ORDER_ROLE,
     MAKE_SELL_ORDER_ROLE
 
@@ -71,7 +70,7 @@ contract('AugmentedBondingCurve app', accounts => {
   const unauthorized = accounts[3]
   const beneficiary = accounts[4]
 
-  const initialize = async open => {
+  const initialize = async () => {
     // DAO
     const { dao: _dao, acl: _acl } = await newDao(root)
     dao = _dao
@@ -106,7 +105,6 @@ contract('AugmentedBondingCurve app', accounts => {
       UPDATE_BENEFICIARY_ROLE,
       UPDATE_FEES_ROLE,
       MANAGE_COLLATERAL_TOKEN_ROLE,
-      OPEN_TRADING_ROLE,
       MAKE_BUY_ORDER_ROLE,
       MAKE_SELL_ORDER_ROLE,
     ]
@@ -168,10 +166,6 @@ contract('AugmentedBondingCurve app', accounts => {
         from: authorized,
       }
     )
-
-    if (open) {
-      await marketMaker.open({ from: authorized })
-    }
   }
 
   const purchaseReturn = async (index, supply, balance, amount) => {
@@ -288,13 +282,12 @@ contract('AugmentedBondingCurve app', accounts => {
     UPDATE_BENEFICIARY_ROLE = await mBase.UPDATE_BENEFICIARY_ROLE()
     UPDATE_FEES_ROLE = await mBase.UPDATE_FEES_ROLE()
     MANAGE_COLLATERAL_TOKEN_ROLE = await mBase.MANAGE_COLLATERAL_TOKEN_ROLE()
-    OPEN_TRADING_ROLE = await mBase.OPEN_TRADING_ROLE()
     MAKE_BUY_ORDER_ROLE = await mBase.MAKE_BUY_ORDER_ROLE()
     MAKE_SELL_ORDER_ROLE = await mBase.MAKE_SELL_ORDER_ROLE()
   })
 
   beforeEach(async () => {
-    await initialize(true)
+    await initialize()
   })
   context('> #deploy', () => {
     it('> it should deploy', async () => {
@@ -477,40 +470,6 @@ contract('AugmentedBondingCurve app', accounts => {
           ),
         'INIT_ALREADY_INITIALIZED'
       )
-    })
-  })
-
-  context('> #open', () => {
-    context('> sender has OPEN_TRADING_ROLE', () => {
-      context('> and market making is not yet open', () => {
-        beforeEach(async () => {
-          await initialize(false)
-        })
-
-        it('it should open market making', async () => {
-          const receipt = await marketMaker.open({ from: authorized })
-
-          assertEvent(receipt, 'Open')
-          assert.equal(await marketMaker.isOpen(), true)
-        })
-      })
-
-      context('> but market making is already open', () => {
-        it('it should revert', async () => {
-          // market making is already open through the default initialize() script
-          await assertRevert(() => marketMaker.open({ from: authorized }))
-        })
-      })
-    })
-
-    context('> sender does not have OPEN_TRADING_ROLE', () => {
-      beforeEach(async () => {
-        await initialize(false)
-      })
-
-      it('it should revert', async () => {
-        await assertRevert(() => marketMaker.open({ from: unauthorized }))
-      })
     })
   })
 
@@ -829,121 +788,100 @@ contract('AugmentedBondingCurve app', accounts => {
       const index = round === 'ETH' ? 0 : 1
 
       context('> sender has MAKE_BUY_ORDER_ROLE', () => {
-        context('> and market making is open', () => {
-          context('> and collateral is whitelisted', () => {
-            context('> and value is not zero', () => {
-              context('> and sender has sufficient funds', () => {
-                context('> and no excess value is sent', () => {
-                  it('it should make buy order', async () => {
-                    const amount = random.amount()
-                    const expectedReturnAmount = await expectedPurchaseReturnForAmount(
-                      index,
-                      amount
-                    )
-                    const senderBalanceBefore = await token.balanceOf(authorized)
+        context('> and collateral is whitelisted', () => {
+          context('> and value is not zero', () => {
+            context('> and sender has sufficient funds', () => {
+              context('> and no excess value is sent', () => {
+                it('it should make buy order', async () => {
+                  const amount = random.amount()
+                  const expectedReturnAmount = await expectedPurchaseReturnForAmount(
+                    index,
+                    amount
+                  )
+                  const senderBalanceBefore = await token.balanceOf(authorized)
 
-                    const receipt = await makeBuyOrder(
-                      authorized,
-                      collaterals[index],
-                      amount,
-                      expectedReturnAmount,
-                      { from: authorized }
-                    )
+                  const receipt = await makeBuyOrder(
+                    authorized,
+                    collaterals[index],
+                    amount,
+                    expectedReturnAmount,
+                    { from: authorized }
+                  )
 
-                    const senderBalanceAfter = await token.balanceOf(authorized)
-                    assertEvent(receipt, 'MakeBuyOrder')
-                    assert.equal(
-                      senderBalanceAfter.sub(senderBalanceBefore).toString(),
-                      expectedReturnAmount.toString()
-                    )
-                  })
-
-                  it('it should deduct fee', async () => {
-                    const beneficiaryBalanceBefore = bn(
-                      await getBalance(collaterals[index], beneficiary)
-                    )
-                    const amount = random.amount()
-                    const fee = computeBuyFee(amount)
-
-                    await makeBuyOrder(authorized, collaterals[index], amount, 0, {
-                      from: authorized,
-                    })
-
-                    const beneficiaryBalanceAfter = bn(
-                      await getBalance(collaterals[index], beneficiary)
-                    )
-                    assertBn(beneficiaryBalanceAfter.sub(beneficiaryBalanceBefore), fee)
-                  })
-
-                  it('it should collect collateral', async () => {
-                    const reserveBalanceBefore = bn(
-                      await getBalance(collaterals[index], reserve.address)
-                    )
-                    const amount = random.amount()
-                    const fee = computeBuyFee(amount)
-                    const amountAfterFee = amount.sub(fee)
-
-                    await makeBuyOrder(authorized, collaterals[index], amount, 0, {
-                      from: authorized,
-                    })
-
-                    const reserveBalanceAfter = bn(
-                      await getBalance(collaterals[index], reserve.address)
-                    )
-                    assertBn(reserveBalanceAfter.sub(reserveBalanceBefore), amountAfterFee)
-                  })
-
-                  context('> but order returns less than min return amount', () => {
-                    it('it should revert', async () => {
-                      const amount = random.amount()
-                      const expectedReturnAmount = bn(
-                        await expectedPurchaseReturnForAmount(index, amount)
-                      )
-
-                      await assertRevert(
-                        () =>
-                          makeBuyOrder(
-                            authorized,
-                            collaterals[index],
-                            amount,
-                            expectedReturnAmount.add(bn(1)),
-                            { from: authorized }
-                          ),
-                        'MM_SLIPPAGE_EXCEEDS_LIMIT'
-                      )
-                    })
-                  })
+                  const senderBalanceAfter = await token.balanceOf(authorized)
+                  assertEvent(receipt, 'MakeBuyOrder')
+                  assert.equal(
+                    senderBalanceAfter.sub(senderBalanceBefore).toString(),
+                    expectedReturnAmount.toString()
+                  )
                 })
 
-                context('> but excess value is sent', () => {
+                it('it should deduct fee', async () => {
+                  const beneficiaryBalanceBefore = bn(
+                    await getBalance(collaterals[index], beneficiary)
+                  )
+                  const amount = random.amount()
+                  const fee = computeBuyFee(amount)
+
+                  await makeBuyOrder(authorized, collaterals[index], amount, 0, {
+                    from: authorized,
+                  })
+
+                  const beneficiaryBalanceAfter = bn(
+                    await getBalance(collaterals[index], beneficiary)
+                  )
+                  assertBn(beneficiaryBalanceAfter.sub(beneficiaryBalanceBefore), fee)
+                })
+
+                it('it should collect collateral', async () => {
+                  const reserveBalanceBefore = bn(
+                    await getBalance(collaterals[index], reserve.address)
+                  )
+                  const amount = random.amount()
+                  const fee = computeBuyFee(amount)
+                  const amountAfterFee = amount.sub(fee)
+
+                  await makeBuyOrder(authorized, collaterals[index], amount, 0, {
+                    from: authorized,
+                  })
+
+                  const reserveBalanceAfter = bn(
+                    await getBalance(collaterals[index], reserve.address)
+                  )
+                  assertBn(reserveBalanceAfter.sub(reserveBalanceBefore), amountAfterFee)
+                })
+
+                context('> but order returns less than min return amount', () => {
                   it('it should revert', async () => {
                     const amount = random.amount()
+                    const expectedReturnAmount = bn(
+                      await expectedPurchaseReturnForAmount(index, amount)
+                    )
 
                     await assertRevert(
                       () =>
-                        makeBuyOrder(authorized, collaterals[index], amount, 0, {
-                          from: authorized,
-                          value: amount.add(bn(1)),
-                        }),
-                      'MM_INVALID_COLLATERAL_VALUE'
-                    ) // should revert both for ETH and ERC20
+                        makeBuyOrder(
+                          authorized,
+                          collaterals[index],
+                          amount,
+                          expectedReturnAmount.add(bn(1)),
+                          { from: authorized }
+                        ),
+                      'MM_SLIPPAGE_EXCEEDS_LIMIT'
+                    )
                   })
                 })
               })
 
-              context('> but sender does not have sufficient funds', () => {
+              context('> but excess value is sent', () => {
                 it('it should revert', async () => {
                   const amount = random.amount()
-                  // let's burn the extra tokens to end up with a small balance
-                  await collateral.transfer(unauthorized, INITIAL_TOKEN_BALANCE.sub(amount), {
-                    from: authorized,
-                  })
 
                   await assertRevert(
                     () =>
-                      makeBuyOrder(authorized, collaterals[index], amount.add(bn(1)), 0, {
+                      makeBuyOrder(authorized, collaterals[index], amount, 0, {
                         from: authorized,
-                        value: amount.sub(bn(1)),
+                        value: amount.add(bn(1)),
                       }),
                     'MM_INVALID_COLLATERAL_VALUE'
                   ) // should revert both for ETH and ERC20
@@ -951,47 +889,50 @@ contract('AugmentedBondingCurve app', accounts => {
               })
             })
 
-            context('> but value is zero', () => {
+            context('> but sender does not have sufficient funds', () => {
               it('it should revert', async () => {
+                const amount = random.amount()
+                // let's burn the extra tokens to end up with a small balance
+                await collateral.transfer(unauthorized, INITIAL_TOKEN_BALANCE.sub(amount), {
+                  from: authorized,
+                })
+
                 await assertRevert(
-                  () => makeBuyOrder(authorized, collaterals[index], 0, 0, { from: authorized }),
+                  () =>
+                    makeBuyOrder(authorized, collaterals[index], amount.add(bn(1)), 0, {
+                      from: authorized,
+                      value: amount.sub(bn(1)),
+                    }),
                   'MM_INVALID_COLLATERAL_VALUE'
-                )
+                ) // should revert both for ETH and ERC20
               })
             })
           })
 
-          context('> but collateral is not whitelisted', () => {
+          context('> but value is zero', () => {
             it('it should revert', async () => {
-              // we can't test un-whitelisted ETH unless we re-deploy a DAO without ETH as a whitelisted
-              // collateral just for that use case it's not worth it because the logic is the same than ERC20 anyhow
-              const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
-              await unlisted.approve(marketMaker.address, INITIAL_TOKEN_BALANCE, {
-                from: authorized,
-              })
               await assertRevert(
-                () =>
-                  makeBuyOrder(authorized, unlisted.address, random.amount(), 0, {
-                    from: authorized,
-                  }),
-                'MM_COLLATERAL_NOT_WHITELISTED'
+                () => makeBuyOrder(authorized, collaterals[index], 0, 0, { from: authorized }),
+                'MM_INVALID_COLLATERAL_VALUE'
               )
             })
           })
         })
 
-        context('> but market making is not open', () => {
-          beforeEach(async () => {
-            await initialize(false)
-          })
-
+        context('> but collateral is not whitelisted', () => {
           it('it should revert', async () => {
+            // we can't test un-whitelisted ETH unless we re-deploy a DAO without ETH as a whitelisted
+            // collateral just for that use case it's not worth it because the logic is the same than ERC20 anyhow
+            const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
+            await unlisted.approve(marketMaker.address, INITIAL_TOKEN_BALANCE, {
+              from: authorized,
+            })
             await assertRevert(
               () =>
-                makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                makeBuyOrder(authorized, unlisted.address, random.amount(), 0, {
                   from: authorized,
                 }),
-              'MM_NOT_OPEN'
+              'MM_COLLATERAL_NOT_WHITELISTED'
             )
           })
         })
@@ -1017,182 +958,174 @@ contract('AugmentedBondingCurve app', accounts => {
       const index = round === 'ETH' ? 0 : 1
 
       context('> sender has MAKE_SELL_ORDER_ROLE', () => {
-        context('> and market making is open', () => {
-          context('> and collateral is whitelisted', () => {
-            context('> and amount is not zero', () => {
-              context('> and sender has sufficient funds', () => {
-                context('> and pool has sufficient funds', () => {
-                  context('> and there is one order', () => {
-                    it('it should make sell order', async () => {
-                      await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
-                        from: authorized,
-                      })
-
-                      const collateralBalanceBefore =
-                        index === 0
-                          ? bn(await web3.eth.getBalance(authorized))
-                          : bn(await collateral.balanceOf(authorized))
-                      const tokenBalanceBefore = await token.balanceOf(authorized)
-                      const expectedSaleReturn = await expectedSaleReturnForAmount(
-                        index,
-                        tokenBalanceBefore
-                      )
-
-                      const sellReceipt = await makeSellOrder(
-                        authorized,
-                        collaterals[index],
-                        tokenBalanceBefore,
-                        expectedSaleReturn,
-                        { from: authorized2 }
-                      )
-
-                      const tokenBalanceAfter = await token.balanceOf(authorized)
-                      const collateralBalanceAfter =
-                        index === 0
-                          ? bn(await web3.eth.getBalance(authorized))
-                          : bn(await collateral.balanceOf(authorized))
-                      const collateralReturned = collateralBalanceAfter.sub(collateralBalanceBefore)
-
-                      assertEvent(sellReceipt, 'MakeSellOrder')
-                      assertBn(tokenBalanceAfter, 0)
-                      assertBn(await token.totalSupply(), 0)
-                      assertBn(collateralReturned, expectedSaleReturn)
-                    })
-
-                    it('it should collect fees', async () => {
-                      await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
-                        from: authorized,
-                      })
-                      const senderBalance = await token.balanceOf(authorized)
-                      const beneficiaryBalanceBefore =
-                        index === 0
-                          ? bn(await web3.eth.getBalance(beneficiary))
-                          : bn(await collateral.balanceOf(beneficiary))
-                      const fee = await sellFeeAfterExchange(index, senderBalance)
-
-                      await makeSellOrder(authorized, collaterals[index], senderBalance, 0, {
-                        from: authorized,
-                      })
-
-                      const beneficiaryBalanceAfter =
-                        index === 0
-                          ? bn(await web3.eth.getBalance(beneficiary))
-                          : bn(await collateral.balanceOf(beneficiary))
-                      assertBn(beneficiaryBalanceAfter.sub(beneficiaryBalanceBefore), fee)
-                    })
-                  })
-                })
-
-                context('> but pool does not have sufficient funds', () => {
-                  it('it should revert', async () => {
-                    const index_ = index === 1 ? 0 : 1
-                    // let's add some collateral into the pool
-
+        context('> and collateral is whitelisted', () => {
+          context('> and amount is not zero', () => {
+            context('> and sender has sufficient funds', () => {
+              context('> and pool has sufficient funds', () => {
+                context('> and there is one order', () => {
+                  it('it should make sell order', async () => {
                     await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
                       from: authorized,
                     })
-                    await makeBuyOrder(authorized, collaterals[index_], random.amount(), 0, {
-                      from: authorized,
-                    })
-                    const senderBalance = await token.balanceOf(authorized)
 
-                    // redeem more bonds against the base collateral than it can pay for and assert it reverts
-                    await assertRevert(
-                      () =>
-                        makeSellOrder(authorized, collaterals[index], senderBalance, 0, {
-                          from: authorized,
-                        }),
-                      index === 0 ? 'VAULT_SEND_REVERTED' : 'VAULT_TOKEN_TRANSFER_REVERTED'
-                    )
-                  })
-                })
-
-                context('> but order returns less than minReturnAmount', () => {
-                  it('it should revert', async () => {
-                    await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
-                      from: authorized,
-                    })
-                    const senderBalance = await token.balanceOf(authorized)
-
+                    const collateralBalanceBefore =
+                      index === 0
+                        ? bn(await web3.eth.getBalance(authorized))
+                        : bn(await collateral.balanceOf(authorized))
+                    const tokenBalanceBefore = await token.balanceOf(authorized)
                     const expectedSaleReturn = await expectedSaleReturnForAmount(
                       index,
-                      senderBalance
+                      tokenBalanceBefore
                     )
 
-                    await assertRevert(
-                      () =>
-                        makeSellOrder(
-                          authorized,
-                          collaterals[index],
-                          senderBalance,
-                          expectedSaleReturn.add(bn(1)),
-                          { from: authorized }
-                        ),
-                      'MM_SLIPPAGE_EXCEEDS_LIMIT'
+                    const sellReceipt = await makeSellOrder(
+                      authorized,
+                      collaterals[index],
+                      tokenBalanceBefore,
+                      expectedSaleReturn,
+                      { from: authorized2 }
                     )
+
+                    const tokenBalanceAfter = await token.balanceOf(authorized)
+                    const collateralBalanceAfter =
+                      index === 0
+                        ? bn(await web3.eth.getBalance(authorized))
+                        : bn(await collateral.balanceOf(authorized))
+                    const collateralReturned = collateralBalanceAfter.sub(collateralBalanceBefore)
+
+                    assertEvent(sellReceipt, 'MakeSellOrder')
+                    assertBn(tokenBalanceAfter, 0)
+                    assertBn(await token.totalSupply(), 0)
+                    assertBn(collateralReturned, expectedSaleReturn)
+                  })
+
+                  it('it should collect fees', async () => {
+                    await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                      from: authorized,
+                    })
+                    const senderBalance = await token.balanceOf(authorized)
+                    const beneficiaryBalanceBefore =
+                      index === 0
+                        ? bn(await web3.eth.getBalance(beneficiary))
+                        : bn(await collateral.balanceOf(beneficiary))
+                    const fee = await sellFeeAfterExchange(index, senderBalance)
+
+                    await makeSellOrder(authorized, collaterals[index], senderBalance, 0, {
+                      from: authorized,
+                    })
+
+                    const beneficiaryBalanceAfter =
+                      index === 0
+                        ? bn(await web3.eth.getBalance(beneficiary))
+                        : bn(await collateral.balanceOf(beneficiary))
+                    assertBn(beneficiaryBalanceAfter.sub(beneficiaryBalanceBefore), fee)
                   })
                 })
               })
 
-              context('> but sender does not have sufficient funds', () => {
+              context('> but pool does not have sufficient funds', () => {
+                it('it should revert', async () => {
+                  const index_ = index === 1 ? 0 : 1
+                  // let's add some collateral into the pool
+
+                  await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+                    from: authorized,
+                  })
+                  await makeBuyOrder(authorized, collaterals[index_], random.amount(), 0, {
+                    from: authorized,
+                  })
+                  const senderBalance = await token.balanceOf(authorized)
+
+                  // redeem more bonds against the base collateral than it can pay for and assert it reverts
+                  await assertRevert(
+                    () =>
+                      makeSellOrder(authorized, collaterals[index], senderBalance, 0, {
+                        from: authorized,
+                      }),
+                    index === 0 ? 'VAULT_SEND_REVERTED' : 'VAULT_TOKEN_TRANSFER_REVERTED'
+                  )
+                })
+              })
+
+              context('> but order returns less than minReturnAmount', () => {
                 it('it should revert', async () => {
                   await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
                     from: authorized,
                   })
                   const senderBalance = await token.balanceOf(authorized)
 
+                  const expectedSaleReturn = await expectedSaleReturnForAmount(
+                    index,
+                    senderBalance
+                  )
+
                   await assertRevert(
                     () =>
-                      makeSellOrder(authorized, collaterals[index], senderBalance.add(bn(1)), 0, {
-                        from: authorized,
-                      }),
-                    'MM_INVALID_BOND_AMOUNT'
+                      makeSellOrder(
+                        authorized,
+                        collaterals[index],
+                        senderBalance,
+                        expectedSaleReturn.add(bn(1)),
+                        { from: authorized }
+                      ),
+                    'MM_SLIPPAGE_EXCEEDS_LIMIT'
                   )
                 })
               })
             })
 
-            context('> but amount is zero', () => {
+            context('> but sender does not have sufficient funds', () => {
               it('it should revert', async () => {
                 await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
                   from: authorized,
                 })
+                const senderBalance = await token.balanceOf(authorized)
 
                 await assertRevert(
-                  () => makeSellOrder(authorized, collaterals[index], 0, 0, { from: authorized }),
+                  () =>
+                    makeSellOrder(authorized, collaterals[index], senderBalance.add(bn(1)), 0, {
+                      from: authorized,
+                    }),
                   'MM_INVALID_BOND_AMOUNT'
                 )
               })
             })
           })
 
-          context('> but collateral is not whitelisted', () => {
+          context('> but amount is zero', () => {
             it('it should revert', async () => {
-              // we can't test un-whitelisted ETH unless we re-deploy a DAO without ETH as a whitelisted
-              // collateral just for that use case it's not worth it because the logic is the same than ERC20 anyhow
-              const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
-              await unlisted.approve(marketMaker.address, INITIAL_TOKEN_BALANCE, {
-                from: authorized,
-              })
               await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
                 from: authorized,
               })
-              const senderBalance = await token.balanceOf(authorized)
 
               await assertRevert(
-                () =>
-                  makeSellOrder(authorized, unlisted.address, senderBalance, 0, {
-                    from: authorized,
-                  }),
-                'MM_COLLATERAL_NOT_WHITELISTED'
+                () => makeSellOrder(authorized, collaterals[index], 0, 0, { from: authorized }),
+                'MM_INVALID_BOND_AMOUNT'
               )
             })
           })
         })
 
-        context('> but market making is not open', () => {
+        context('> but collateral is not whitelisted', () => {
           it('it should revert', async () => {
-            // can't test cause we need the market making to be open to have bonds to redeem
+            // we can't test un-whitelisted ETH unless we re-deploy a DAO without ETH as a whitelisted
+            // collateral just for that use case it's not worth it because the logic is the same than ERC20 anyhow
+            const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
+            await unlisted.approve(marketMaker.address, INITIAL_TOKEN_BALANCE, {
+              from: authorized,
+            })
+            await makeBuyOrder(authorized, collaterals[index], random.amount(), 0, {
+              from: authorized,
+            })
+            const senderBalance = await token.balanceOf(authorized)
+
+            await assertRevert(
+              () =>
+                makeSellOrder(authorized, unlisted.address, senderBalance, 0, {
+                  from: authorized,
+                }),
+              'MM_COLLATERAL_NOT_WHITELISTED'
+            )
           })
         })
       })

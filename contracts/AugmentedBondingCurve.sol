@@ -21,7 +21,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     bytes32 public constant UPDATE_BENEFICIARY_ROLE                    = keccak256("UPDATE_BENEFICIARY_ROLE");
     bytes32 public constant UPDATE_FEES_ROLE                           = keccak256("UPDATE_FEES_ROLE");
     bytes32 public constant MANAGE_COLLATERAL_TOKEN_ROLE               = keccak256("MANAGE_COLLATERAL_TOKEN_ROLE");
-    bytes32 public constant OPEN_TRADING_ROLE                          = keccak256("OPEN_TRADING_ROLE");
     bytes32 public constant MAKE_BUY_ORDER_ROLE                        = keccak256("MAKE_BUY_ORDER_ROLE");
     bytes32 public constant MAKE_SELL_ORDER_ROLE                       = keccak256("MAKE_SELL_ORDER_ROLE");
     */
@@ -29,7 +28,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     bytes32 public constant UPDATE_BENEFICIARY_ROLE                    = 0xf7ea2b80c7b6a2cab2c11d2290cb005c3748397358a25e17113658c83b732593;
     bytes32 public constant UPDATE_FEES_ROLE                           = 0x5f9be2932ed3a723f295a763be1804c7ebfd1a41c1348fb8bdf5be1c5cdca822;
     bytes32 public constant MANAGE_COLLATERAL_TOKEN_ROLE               = 0xd9d296b0bc78eaab1039dfb623e942381a5402711b7fcec0bfb94004c18879f4;
-    bytes32 public constant OPEN_TRADING_ROLE                          = 0x26ce034204208c0bbca4c8a793d17b99e546009b1dd31d3c1ef761f66372caf6;
     bytes32 public constant MAKE_BUY_ORDER_ROLE                        = 0x0dfea6908176d96adbee7026b3fe9fbdaccfc17bc443ddf14734fd27c3136179;
     bytes32 public constant MAKE_SELL_ORDER_ROLE                       = 0x52e3ace6a83e0c810920056ccc32fed5aa1e86287545113b03a52ab5c84e3f66;
 
@@ -44,8 +42,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     string private constant ERROR_INVALID_COLLATERAL             = "MM_INVALID_COLLATERAL";
     string private constant ERROR_INVALID_COLLATERAL_VALUE       = "MM_INVALID_COLLATERAL_VALUE";
     string private constant ERROR_INVALID_BOND_AMOUNT            = "MM_INVALID_BOND_AMOUNT";
-    string private constant ERROR_ALREADY_OPEN                   = "MM_ALREADY_OPEN";
-    string private constant ERROR_NOT_OPEN                       = "MM_NOT_OPEN";
     string private constant ERROR_COLLATERAL_ALREADY_WHITELISTED = "MM_COLLATERAL_ALREADY_WHITELISTED";
     string private constant ERROR_COLLATERAL_NOT_WHITELISTED     = "MM_COLLATERAL_NOT_WHITELISTED";
     string private constant ERROR_SLIPPAGE_EXCEEDS_LIMIT         = "MM_SLIPPAGE_EXCEEDS_LIMIT";
@@ -77,7 +73,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     uint256 public buyFeePct;
     uint256 public sellFeePct;
 
-    bool public isOpen;
     mapping(address => Collateral) public collaterals;
 
     event UpdateBeneficiary(address indexed beneficiary);
@@ -96,7 +91,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         uint256 virtualBalance,
         uint32  reserveRatio
     );
-    event Open();
     event MakeBuyOrder(
         address indexed buyer,
         address indexed collateral,
@@ -154,15 +148,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     }
 
     /* generic settings related function */
-
-    /**
-     * @notice Open market making [enabling users to open buy and sell orders]
-    */
-    function open() external auth(OPEN_TRADING_ROLE) {
-        require(!isOpen, ERROR_ALREADY_OPEN);
-
-        _open();
-    }
 
     /**
      * @notice Update formula to `_formula`
@@ -265,7 +250,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     function makeSellOrder(address _seller, address _collateral, uint256 _sellAmount, uint256 _minReturnAmountAfterFee)
         external nonReentrant authP(MAKE_SELL_ORDER_ROLE, arr(_seller))
     {
-        require(isOpen, ERROR_NOT_OPEN);
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
         require(_bondAmountIsValid(_seller, _sellAmount), ERROR_INVALID_BOND_AMOUNT);
 
@@ -380,7 +364,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     function _makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee, bool _noPreApproval)
         internal nonReentrant
     {
-        require(isOpen, ERROR_NOT_OPEN);
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
         require(_collateralValueIsValid(_collateral, _depositAmount), ERROR_INVALID_COLLATERAL_VALUE);
 
@@ -452,12 +435,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         require(depositAmount == _amount, ERROR_DEPOSIT_NOT_AMOUNT);
 
         _makeBuyOrder(buyerAddress, collateralTokenAddress, depositAmount, minReturnAmountAfterFee, true);
-    }
-
-    function _open() internal {
-        isOpen = true;
-
-        emit Open();
     }
 
     function _updateBeneficiary(address _beneficiary) internal {

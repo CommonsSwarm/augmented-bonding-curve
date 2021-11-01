@@ -20,7 +20,6 @@ Augmented Bonding Curve is initialized with:
 ## Roles
 
 The augmented bonding curve app implements the following roles:
-* **OPEN_TRADING_ROLE**: Used to activate the bonding curve.
 * **MAKE_BUY_ORDER_ROLE**: Necessary to convert collateral tokens into bonded tokens.
 * **MAKE_SELL_ORDER_ROLE**: Necessary to convert bonded tokens into collateral tokens.
 * **MANAGE_COLLATERAL_TOKEN_ROLE**: Used to manage more than one collateral (many bonding curves can be managed with just one instance of the app).
