@@ -23,7 +23,7 @@ The augmented bonding curve app implements the following roles:
 * **OPEN_TRADING_ROLE**: Used to activate the bonding curve.
 * **MAKE_BUY_ORDER_ROLE**: Necessary to convert collateral tokens into bonded tokens.
 * **MAKE_SELL_ORDER_ROLE**: Necessary to convert bonded tokens into collateral tokens.
-* **ADD_COLLATERAL_TOKEN_ROLE**, **REMOVE_COLLATERAL_TOKEN_ROLE**, and **UPDATE_COLLATERAL_TOKEN_ROLE**: Used to manage more than one collateral (many bonding curves can be managed with just one instance of the app).
+* **MANAGE_COLLATERAL_TOKEN_ROLE**: Used to manage more than one collateral (many bonding curves can be managed with just one instance of the app).
 * **UPDATE_FORMULA_ROLE**: Used in case we need to update the bonding curve formula.
 * **UPDATE_BENEFICIARY_ROLE**: Used in case we need to update the funding pool address.
 * **UPDATE_FEES_ROLE**: Used to change entry and exit fees/tributes.
