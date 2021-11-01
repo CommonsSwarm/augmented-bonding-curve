@@ -276,7 +276,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         tokenManager.burn(_seller, _sellAmount);
 
         uint256 collateralSupply = token.totalSupply().add(collaterals[_collateral].virtualSupply);
-        uint256 collateralBalanceOfReserve = balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
+        uint256 collateralBalanceOfReserve = _balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
         uint32 reserveRatio = collaterals[_collateral].reserveRatio;
         uint256 returnAmount = formula.calculateSaleReturn(collateralSupply, collateralBalanceOfReserve, reserveRatio, _sellAmount);
 
@@ -325,13 +325,13 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         return uint256(PPM).mul(uint256(PPM)).mul(_balance).div(_supply.mul(uint256(_reserveRatio)));
     }
 
-    function balanceOf(address _who, address _token) public view isInitialized returns (uint256) {
-        return _token == ETH ? _who.balance : ERC20(_token).staticBalanceOf(_who);
-    }
-
     /***** internal functions *****/
 
     /* check functions */
+
+    function _balanceOf(address _who, address _token) internal view isInitialized returns (uint256) {
+        return _token == ETH ? _who.balance : ERC20(_token).staticBalanceOf(_who);
+    }
 
     function _beneficiaryIsValid(address _beneficiary) internal pure returns (bool) {
         return _beneficiary != address(0);
@@ -399,7 +399,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         _transfer(_buyer, address(reserve), _collateral, depositAmountLessFee, _noPreApproval);
 
         uint256 collateralSupply = token.totalSupply().add(collaterals[_collateral].virtualSupply);
-        uint256 collateralBalanceOfReserve = balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
+        uint256 collateralBalanceOfReserve = _balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
         uint32 reserveRatio = collaterals[_collateral].reserveRatio;
         uint256 returnAmount = formula.calculatePurchaseReturn(collateralSupply, collateralBalanceOfReserve, reserveRatio, depositAmountLessFee);
 
