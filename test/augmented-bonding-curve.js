@@ -794,10 +794,7 @@ contract('AugmentedBondingCurve app', accounts => {
               context('> and no excess value is sent', () => {
                 it('it should make buy order', async () => {
                   const amount = random.amount()
-                  const expectedReturnAmount = await expectedPurchaseReturnForAmount(
-                    index,
-                    amount
-                  )
+                  const expectedReturnAmount = await expectedPurchaseReturnForAmount(index, amount)
                   const senderBalanceBefore = await token.balanceOf(authorized)
 
                   const receipt = await makeBuyOrder(
@@ -1054,10 +1051,7 @@ contract('AugmentedBondingCurve app', accounts => {
                   })
                   const senderBalance = await token.balanceOf(authorized)
 
-                  const expectedSaleReturn = await expectedSaleReturnForAmount(
-                    index,
-                    senderBalance
-                  )
+                  const expectedSaleReturn = await expectedSaleReturnForAmount(index, senderBalance)
 
                   await assertRevert(
                     () =>

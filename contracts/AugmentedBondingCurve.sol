@@ -45,7 +45,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     string private constant ERROR_COLLATERAL_ALREADY_WHITELISTED = "MM_COLLATERAL_ALREADY_WHITELISTED";
     string private constant ERROR_COLLATERAL_NOT_WHITELISTED     = "MM_COLLATERAL_NOT_WHITELISTED";
     string private constant ERROR_SLIPPAGE_EXCEEDS_LIMIT         = "MM_SLIPPAGE_EXCEEDS_LIMIT";
-    string private constant ERROR_TRANSFER_FAILED                = "MM_TRANSFER_FAILED";
     string private constant ERROR_TRANSFER_FROM_FAILED           = "MM_TRANSFER_FROM_FAILED";
     string private constant ERROR_NOT_BUY_FUNCTION               = "MM_NOT_BUY_FUNCTION";
     string private constant ERROR_BUYER_NOT_FROM                 = "MM_BUYER_NOT_FROM";
@@ -54,8 +53,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     string private constant ERROR_NO_PERMISSION                  = "MM_NO_PERMISSION";
     string private constant ERROR_TOKEN_NOT_SENDER               = "MM_TOKEN_NOT_SENDER";
     string private constant ERROR_INVALID_BUY_ORDER_DATA         = "MM_INVALID_BUY_ORDER_DATA";
-
-    uint256 private constant EXPECTED_BUY_ORDER_DATA_LEN = 132; // 4 + 32 + 32 + 32 + 32 = bytes needed to encode makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
 
     struct Collateral {
         uint256 virtualSupply;
@@ -237,7 +234,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     function makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
         external payable authP(MAKE_BUY_ORDER_ROLE, arr(_buyer))
     {
-        _makeBuyOrder(_buyer, _collateral, _depositAmount, _minReturnAmountAfterFee, false);
+        _makeBuyOrder(_buyer, _collateral, _depositAmount, _minReturnAmountAfterFee);
     }
 
     /**
@@ -286,7 +283,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     function receiveApproval(address _from, uint256 _amount, address _token, bytes _buyOrderData) public {
         require(_token == msg.sender, ERROR_TOKEN_NOT_SENDER);
         require(canPerform(_from, MAKE_BUY_ORDER_ROLE, new uint256[](0)), ERROR_NO_PERMISSION);
-        require(ERC20(msg.sender).safeTransferFrom(_from, address(this), _amount), ERROR_TRANSFER_FAILED);
 
         _makeBuyOrderRaw(_from, msg.sender, _amount, _buyOrderData);
     }
@@ -359,9 +355,8 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
      * @param _collateral The address of the collateral token to be deposited
      * @param _depositAmount The amount of collateral token to be deposited
      * @param _minReturnAmountAfterFee The minimum amount of the returned bonded tokens
-     * @param _noPreApproval Whether or not funds should have already been transferred
      */
-    function _makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee, bool _noPreApproval)
+    function _makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
         internal nonReentrant
     {
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
@@ -373,9 +368,9 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
 
         // collect fee and collateral
         if (fee > 0) {
-            _transfer(_buyer, beneficiary, _collateral, fee, _noPreApproval);
+            _transfer(_buyer, beneficiary, _collateral, fee);
         }
-        _transfer(_buyer, address(reserve), _collateral, depositAmountLessFee, _noPreApproval);
+        _transfer(_buyer, address(reserve), _collateral, depositAmountLessFee);
 
         uint256 collateralSupply = token.totalSupply().add(collaterals[_collateral].virtualSupply);
         uint256 collateralBalanceOfReserve = _balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
@@ -403,7 +398,8 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     function _makeBuyOrderRaw(address _from, address _token, uint256 _amount, bytes memory _buyOrderData)
         internal
     {
-        require(_buyOrderData.length == EXPECTED_BUY_ORDER_DATA_LEN, ERROR_INVALID_BUY_ORDER_DATA);
+        // 32 + 4 + 32 + 32 + 32 = 132 (bytes array length + sig + address _buyer + address _collateral + uint256 _depositAmount)
+        require(_buyOrderData.length == 132, ERROR_INVALID_BUY_ORDER_DATA);
         bytes memory buyOrderDataCopy = _buyOrderData;
 
         bytes4 functionSig;
@@ -434,7 +430,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         require(collateralTokenAddress == _token, ERROR_COLLATERAL_NOT_SENDER);
         require(depositAmount == _amount, ERROR_DEPOSIT_NOT_AMOUNT);
 
-        _makeBuyOrder(buyerAddress, collateralTokenAddress, depositAmount, minReturnAmountAfterFee, true);
+        _makeBuyOrder(buyerAddress, collateralTokenAddress, depositAmount, minReturnAmountAfterFee);
     }
 
     function _updateBeneficiary(address _beneficiary) internal {
@@ -488,11 +484,9 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         emit UpdateCollateralToken(_collateral, _virtualSupply, _virtualBalance, _reserveRatio);
     }
 
-    function _transfer(address _from, address _to, address _collateralToken, uint256 _amount, bool _noPreApproval) internal {
+    function _transfer(address _from, address _to, address _collateralToken, uint256 _amount) internal {
         if (_collateralToken == ETH) {
             _to.transfer(_amount);
-        } else if (_noPreApproval) {
-            require(ERC20(_collateralToken).safeTransfer(_to, _amount), ERROR_TRANSFER_FAILED);
         } else {
             require(ERC20(_collateralToken).safeTransferFrom(_from, _to, _amount), ERROR_TRANSFER_FROM_FAILED);
         }
