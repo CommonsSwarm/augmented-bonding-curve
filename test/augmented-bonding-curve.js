@@ -508,16 +508,18 @@ contract('AugmentedBondingCurve app', accounts => {
             it('it should revert', async () => {
               const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
 
-              await assertRevert(() =>
-                marketMaker.addCollateralToken(
-                  unlisted.address,
-                  random.virtualSupply(),
-                  random.virtualBalance(),
-                  PPM + 1,
-                  {
-                    from: authorized,
-                  }
-                )
+              await assertRevert(
+                () =>
+                  marketMaker.addCollateralToken(
+                    unlisted.address,
+                    random.virtualSupply(),
+                    random.virtualBalance(),
+                    PPM + 1,
+                    {
+                      from: authorized,
+                    }
+                  ),
+                'MM_INVALID_RESERVE_RATIO'
               )
             })
           })
@@ -542,14 +544,16 @@ contract('AugmentedBondingCurve app', accounts => {
 
       context('> but collateral token has already been added', () => {
         it('it should revert', async () => {
-          await assertRevert(() =>
-            marketMaker.addCollateralToken(
-              ETH,
-              random.virtualSupply(),
-              random.virtualBalance(),
-              random.reserveRatio(),
-              { from: authorized }
-            )
+          await assertRevert(
+            () =>
+              marketMaker.addCollateralToken(
+                ETH,
+                random.virtualSupply(),
+                random.virtualBalance(),
+                random.reserveRatio(),
+                { from: authorized }
+              ),
+            'MM_COLLATERAL_ALREADY_WHITELISTED'
           )
         })
       })
@@ -559,16 +563,18 @@ contract('AugmentedBondingCurve app', accounts => {
       it('it should revert', async () => {
         const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
 
-        await assertRevert(() =>
-          marketMaker.addCollateralToken(
-            unlisted.address,
-            random.virtualSupply(),
-            random.virtualBalance(),
-            random.reserveRatio(),
-            {
-              from: unauthorized,
-            }
-          )
+        await assertRevert(
+          () =>
+            marketMaker.addCollateralToken(
+              unlisted.address,
+              random.virtualSupply(),
+              random.virtualBalance(),
+              random.reserveRatio(),
+              {
+                from: unauthorized,
+              }
+            ),
+          'APP_AUTH_FAILED'
         )
       })
     })
@@ -595,8 +601,9 @@ contract('AugmentedBondingCurve app', accounts => {
         it('it should revert', async () => {
           const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
 
-          await assertRevert(() =>
-            marketMaker.removeCollateralToken(unlisted.address, { from: authorized })
+          await assertRevert(
+            () => marketMaker.removeCollateralToken(unlisted.address, { from: authorized }),
+            'MM_COLLATERAL_NOT_WHITELISTED'
           )
         })
       })
@@ -604,8 +611,9 @@ contract('AugmentedBondingCurve app', accounts => {
 
     context('> sender does not have MANAGE_COLLATERAL_TOKEN_ROLE', () => {
       it('it should revert', async () => {
-        await assertRevert(() =>
-          marketMaker.removeCollateralToken(collateral.address, { from: unauthorized })
+        await assertRevert(
+          () => marketMaker.removeCollateralToken(collateral.address, { from: unauthorized }),
+          'APP_AUTH_FAILED'
         )
       })
     })
@@ -641,16 +649,18 @@ contract('AugmentedBondingCurve app', accounts => {
 
         context('> but reserve ratio is not valid', () => {
           it('it should revert', async () => {
-            await assertRevert(() =>
-              marketMaker.updateCollateralToken(
-                collateral.address,
-                random.virtualSupply(),
-                random.virtualBalance(),
-                PPM + 1,
-                {
-                  from: authorized,
-                }
-              )
+            await assertRevert(
+              () =>
+                marketMaker.updateCollateralToken(
+                  collateral.address,
+                  random.virtualSupply(),
+                  random.virtualBalance(),
+                  PPM + 1,
+                  {
+                    from: authorized,
+                  }
+                ),
+              'MM_INVALID_RESERVE_RATIO'
             )
           })
         })
@@ -660,16 +670,18 @@ contract('AugmentedBondingCurve app', accounts => {
         it('it should revert', async () => {
           const unlisted = await TokenMock.new(authorized, INITIAL_TOKEN_BALANCE)
 
-          await assertRevert(() =>
-            marketMaker.updateCollateralToken(
-              unlisted.address,
-              random.virtualSupply(),
-              random.virtualBalance(),
-              random.reserveRatio(),
-              {
-                from: authorized,
-              }
-            )
+          await assertRevert(
+            () =>
+              marketMaker.updateCollateralToken(
+                unlisted.address,
+                random.virtualSupply(),
+                random.virtualBalance(),
+                random.reserveRatio(),
+                {
+                  from: authorized,
+                }
+              ),
+            'MM_COLLATERAL_NOT_WHITELISTED'
           )
         })
       })
@@ -677,16 +689,18 @@ contract('AugmentedBondingCurve app', accounts => {
 
     context('> sender does not have MANAGE_COLLATERAL_TOKEN_ROLE', () => {
       it('it should revert', async () => {
-        await assertRevert(() =>
-          marketMaker.updateCollateralToken(
-            collateral.address,
-            random.virtualSupply(),
-            random.virtualBalance(),
-            random.reserveRatio(),
-            {
-              from: unauthorized,
-            }
-          )
+        await assertRevert(
+          () =>
+            marketMaker.updateCollateralToken(
+              collateral.address,
+              random.virtualSupply(),
+              random.virtualBalance(),
+              random.reserveRatio(),
+              {
+                from: unauthorized,
+              }
+            ),
+          'APP_AUTH_FAILED'
         )
       })
     })
@@ -714,7 +728,10 @@ contract('AugmentedBondingCurve app', accounts => {
 
     context('> sender does not have UPDATE_BENEFICIARY_ROLE', () => {
       it('it should revert', async () => {
-        await assertRevert(() => marketMaker.updateBeneficiary(root, { from: unauthorized }))
+        await assertRevert(
+          () => marketMaker.updateBeneficiary(root, { from: unauthorized }),
+          'APP_AUTH_FAILED'
+        )
       })
     })
   })
@@ -733,7 +750,10 @@ contract('AugmentedBondingCurve app', accounts => {
 
       context('> but formula is not a contract', () => {
         it('it should revert', async () => {
-          await assertRevert(() => marketMaker.updateFormula(root, { from: authorized }))
+          await assertRevert(
+            () => marketMaker.updateFormula(root, { from: authorized }),
+            'MM_CONTRACT_IS_EOA'
+          )
         })
       })
     })
@@ -742,8 +762,9 @@ contract('AugmentedBondingCurve app', accounts => {
       it('it should revert', async () => {
         const formula_ = await Formula.new()
 
-        await assertRevert(() =>
-          marketMaker.updateFormula(formula_.address, { from: unauthorized })
+        await assertRevert(
+          () => marketMaker.updateFormula(formula_.address, { from: unauthorized }),
+          'APP_AUTH_FAILED'
         )
       })
     })
@@ -763,14 +784,16 @@ contract('AugmentedBondingCurve app', accounts => {
 
       context('> but new fees are not valid', () => {
         it('it should revert [buy fee is not valid]', async () => {
-          await assertRevert(() =>
-            marketMaker.updateFees(PCT_BASE.add(bn(1)), 50, { from: authorized })
+          await assertRevert(
+            () => marketMaker.updateFees(PCT_BASE.add(bn(1)), 50, { from: authorized }),
+            'MM_INVALID_PERCENTAGE'
           )
         })
 
         it('it should revert [sell fee is not valid]', async () => {
-          await assertRevert(() =>
-            marketMaker.updateFees(40, PCT_BASE.add(bn(1)), { from: authorized })
+          await assertRevert(
+            () => marketMaker.updateFees(40, PCT_BASE.add(bn(1)), { from: authorized }),
+            'MM_INVALID_PERCENTAGE'
           )
         })
       })
@@ -778,7 +801,10 @@ contract('AugmentedBondingCurve app', accounts => {
 
     context('> sender does not have UPDATE_FEES_ROLE', () => {
       it('it should revert', async () => {
-        await assertRevert(() => marketMaker.updateFees(40, 50, { from: unauthorized }))
+        await assertRevert(
+          () => marketMaker.updateFees(40, 50, { from: unauthorized }),
+          'APP_AUTH_FAILED'
+        )
       })
     })
   })

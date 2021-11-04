@@ -189,9 +189,9 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     function addCollateralToken(address _collateral, uint256 _virtualSupply, uint256 _virtualBalance, uint32 _reserveRatio)
         external auth(MANAGE_COLLATERAL_TOKEN_ROLE)
     {
-        require(isContract(_collateral) || _collateral == ETH, ERROR_INVALID_COLLATERAL);
-        require(!_collateralIsWhitelisted(_collateral),        ERROR_COLLATERAL_ALREADY_WHITELISTED);
-        require(_reserveRatioIsValid(_reserveRatio),           ERROR_INVALID_RESERVE_RATIO);
+        require(_collateral == ETH || ERC20(_collateral).totalSupply() > 0, ERROR_INVALID_COLLATERAL);
+        require(!_collateralIsWhitelisted(_collateral),                     ERROR_COLLATERAL_ALREADY_WHITELISTED);
+        require(_reserveRatioIsValid(_reserveRatio),                        ERROR_INVALID_RESERVE_RATIO);
 
         _addCollateralToken(_collateral, _virtualSupply, _virtualBalance, _reserveRatio);
     }
