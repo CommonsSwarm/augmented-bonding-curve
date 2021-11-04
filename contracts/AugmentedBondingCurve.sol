@@ -362,15 +362,20 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
         require(_collateralValueIsValid(_collateral, _depositAmount), ERROR_INVALID_COLLATERAL_VALUE);
 
+        // collect fee and collateral
+        if (_collateral == ETH) {
+            bool success = address(reserve).call.value(_depositAmount)();
+            require(success, ERROR_TRANSFER_FAILED);
+        } else {
+            require(ERC20(_collateral).safeTransferFrom(_buyer, address(reserve), _depositAmount), ERROR_TRANSFER_FAILED);
+        }
+
         // deduct fee
         uint256 fee = _depositAmount.mul(buyFeePct).div(PCT_BASE);
         uint256 depositAmountLessFee = _depositAmount.sub(fee);
-
-        // collect fee and collateral
         if (fee > 0) {
-            _transfer(_buyer, beneficiary, _collateral, fee);
+            reserve.transfer(_collateral, beneficiary, fee);
         }
-        _transfer(_buyer, address(reserve), _collateral, depositAmountLessFee);
 
         uint256 collateralSupply = token.totalSupply().add(collaterals[_collateral].virtualSupply);
         uint256 collateralBalanceOfReserve = _balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
@@ -482,14 +487,5 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         collaterals[_collateral].reserveRatio = _reserveRatio;
 
         emit UpdateCollateralToken(_collateral, _virtualSupply, _virtualBalance, _reserveRatio);
-    }
-
-    function _transfer(address _from, address _to, address _collateralToken, uint256 _amount) internal {
-        if (_collateralToken == ETH) {
-            bool success = _to.call.value(_amount)();
-            require(success, ERROR_TRANSFER_FAILED);
-        } else {
-            require(ERC20(_collateralToken).safeTransferFrom(_from, _to, _amount), ERROR_TRANSFER_FAILED);
-        }
     }
 }
