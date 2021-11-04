@@ -45,7 +45,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     string private constant ERROR_COLLATERAL_ALREADY_WHITELISTED = "MM_COLLATERAL_ALREADY_WHITELISTED";
     string private constant ERROR_COLLATERAL_NOT_WHITELISTED     = "MM_COLLATERAL_NOT_WHITELISTED";
     string private constant ERROR_SLIPPAGE_EXCEEDS_LIMIT         = "MM_SLIPPAGE_EXCEEDS_LIMIT";
-    string private constant ERROR_TRANSFER_FROM_FAILED           = "MM_TRANSFER_FROM_FAILED";
+    string private constant ERROR_TRANSFER_FAILED                = "MM_TRANSFER_FAILED";
     string private constant ERROR_NOT_BUY_FUNCTION               = "MM_NOT_BUY_FUNCTION";
     string private constant ERROR_BUYER_NOT_FROM                 = "MM_BUYER_NOT_FROM";
     string private constant ERROR_COLLATERAL_NOT_SENDER          = "MM_COLLATERAL_NOT_SENDER";
@@ -486,9 +486,10 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
 
     function _transfer(address _from, address _to, address _collateralToken, uint256 _amount) internal {
         if (_collateralToken == ETH) {
-            _to.transfer(_amount);
+            bool success = _to.call.value(_amount)();
+            require(success, ERROR_TRANSFER_FAILED);
         } else {
-            require(ERC20(_collateralToken).safeTransferFrom(_from, _to, _amount), ERROR_TRANSFER_FROM_FAILED);
+            require(ERC20(_collateralToken).safeTransferFrom(_from, _to, _amount), ERROR_TRANSFER_FAILED);
         }
     }
 }
