@@ -10,7 +10,6 @@ const { assertEvent, assertRevert, assertBn } = require('@aragon/contract-helper
 const getBalance = require('./helpers/getBalance')(web3, TokenMock)
 const random = require('./helpers/random')
 const assertExternalEvent = require('./helpers/assertExternalEvent')
-const forceSendETH = require('./helpers/forceSendETH')
 const { bn, bigExp } = require('@aragon/contract-helpers-test/src/numbers')
 const { injectWeb3, injectArtifacts, ZERO_ADDRESS } = require('@aragon/contract-helpers-test')
 const { newDao, installNewApp } = require('@aragon/contract-helpers-test/src/aragon-os')
@@ -29,8 +28,8 @@ const INITIAL_TOKEN_BALANCE = bigExp(10000, 18) // 10000 DAIs or ANTs
 const PPM = 1000000
 const PCT_BASE = bn('1000000000000000000')
 
-const BUY_FEE_PERCENT = bn('100000000000000000') // 1%
-const SELL_FEE_PERCENT = bn('100000000000000000')
+const BUY_FEE_PERCENT = bn('100000000000000000') // 10%
+const SELL_FEE_PERCENT = bn('100000000000000000') // 10%
 
 const VIRTUAL_SUPPLIES = [bigExp(1, 23), bigExp(1, 22)]
 const VIRTUAL_BALANCES = [bigExp(1, 22), bigExp(1, 20)]
@@ -39,7 +38,9 @@ const RESERVE_RATIOS = [(PPM * 10) / 100, (PPM * 1) / 100]
 const ETH = ZERO_ADDRESS
 
 const balanceOf = async (who, token) => {
-  return token === ETH ? web3.eth.getBalance(who) : (await ERC20.at(token)).balanceOf(who)
+  return bn(
+    token === ETH ? await web3.eth.getBalance(who) : await (await ERC20.at(token)).balanceOf(who)
+  )
 }
 
 contract('AugmentedBondingCurve app', accounts => {
@@ -64,11 +65,7 @@ contract('AugmentedBondingCurve app', accounts => {
     MAKE_BUY_ORDER_ROLE,
     MAKE_SELL_ORDER_ROLE
 
-  const root = accounts[0]
-  const authorized = accounts[1]
-  const authorized2 = accounts[2]
-  const unauthorized = accounts[3]
-  const beneficiary = accounts[4]
+  const [root, authorized, authorized2, unauthorized, beneficiary] = accounts
 
   const initialize = async () => {
     // DAO
@@ -186,10 +183,8 @@ contract('AugmentedBondingCurve app', accounts => {
     const amountNoFee = amount.sub(fee)
 
     const supply = await token.totalSupply()
-    const balanceOfReserve = bn(await balanceOf(reserve.address, collaterals[index])).add(
-      amountNoFee
-    )
-    return await purchaseReturn(index, supply, balanceOfReserve, amountNoFee)
+    const balanceOfReserve = await balanceOf(reserve.address, collaterals[index])
+    return purchaseReturn(index, supply, balanceOfReserve, amountNoFee)
   }
 
   const saleReturn = async (index, supply, balance, amount) => {
@@ -253,7 +248,7 @@ contract('AugmentedBondingCurve app', accounts => {
         : opts && opts.value
         ? opts.value
         : 0
-    return await marketMaker.makeBuyOrder(buyer, collateral, paidAmount, minReturnAmount, {
+    return marketMaker.makeBuyOrder(buyer, collateral, paidAmount, minReturnAmount, {
       from,
       value,
     })
@@ -261,7 +256,7 @@ contract('AugmentedBondingCurve app', accounts => {
 
   const makeSellOrder = async (seller, collateral, paidAmount, minReturnAmount, opts = {}) => {
     const from = opts && opts.from ? opts.from : seller
-    return await marketMaker.makeSellOrder(seller, collateral, paidAmount, minReturnAmount, {
+    return marketMaker.makeSellOrder(seller, collateral, paidAmount, minReturnAmount, {
       from,
     })
   }
@@ -976,7 +971,6 @@ contract('AugmentedBondingCurve app', accounts => {
   })
 
   context('> #makeSellOrder', () => {
-    // forEach(['ETH']).describe(`> %s`, round => {
     forEach(['ETH', 'ERC20']).describe(`> %s`, round => {
       const index = round === 'ETH' ? 0 : 1
 
@@ -991,10 +985,7 @@ contract('AugmentedBondingCurve app', accounts => {
                       from: authorized,
                     })
 
-                    const collateralBalanceBefore =
-                      index === 0
-                        ? bn(await web3.eth.getBalance(authorized))
-                        : bn(await collateral.balanceOf(authorized))
+                    const collateralBalanceBefore = await balanceOf(authorized, collaterals[index])
                     const tokenBalanceBefore = await token.balanceOf(authorized)
                     const expectedSaleReturn = await expectedSaleReturnForAmount(
                       index,
@@ -1010,14 +1001,13 @@ contract('AugmentedBondingCurve app', accounts => {
                     )
 
                     const tokenBalanceAfter = await token.balanceOf(authorized)
-                    const collateralBalanceAfter =
-                      index === 0
-                        ? bn(await web3.eth.getBalance(authorized))
-                        : bn(await collateral.balanceOf(authorized))
+                    const collateralBalanceAfter = await balanceOf(authorized, collaterals[index])
+                    const reserveBalanceAfter = await reserve.balance(collaterals[index])
                     const collateralReturned = collateralBalanceAfter.sub(collateralBalanceBefore)
 
                     assertEvent(sellReceipt, 'MakeSellOrder')
                     assertBn(tokenBalanceAfter, 0)
+                    assert.closeTo(reserveBalanceAfter.toNumber(), 0, 1)
                     assertBn(await token.totalSupply(), 0)
                     assertBn(collateralReturned, expectedSaleReturn)
                   })
@@ -1027,20 +1017,17 @@ contract('AugmentedBondingCurve app', accounts => {
                       from: authorized,
                     })
                     const senderBalance = await token.balanceOf(authorized)
-                    const beneficiaryBalanceBefore =
-                      index === 0
-                        ? bn(await web3.eth.getBalance(beneficiary))
-                        : bn(await collateral.balanceOf(beneficiary))
+                    const beneficiaryBalanceBefore = await balanceOf(
+                      beneficiary,
+                      collaterals[index]
+                    )
                     const fee = await sellFeeAfterExchange(index, senderBalance)
 
                     await makeSellOrder(authorized, collaterals[index], senderBalance, 0, {
                       from: authorized,
                     })
 
-                    const beneficiaryBalanceAfter =
-                      index === 0
-                        ? bn(await web3.eth.getBalance(beneficiary))
-                        : bn(await collateral.balanceOf(beneficiary))
+                    const beneficiaryBalanceAfter = await balanceOf(beneficiary, collaterals[index])
                     assertBn(beneficiaryBalanceAfter.sub(beneficiaryBalanceBefore), fee)
                   })
                 })

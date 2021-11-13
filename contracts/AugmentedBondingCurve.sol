@@ -362,6 +362,14 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
         require(_collateralValueIsValid(_collateral, _depositAmount), ERROR_INVALID_COLLATERAL_VALUE);
 
+        uint256 fee = _depositAmount.mul(buyFeePct).div(PCT_BASE);
+        uint256 depositAmountLessFee = _depositAmount.sub(fee);
+
+        uint256 collateralSupply = token.totalSupply().add(collaterals[_collateral].virtualSupply);
+        uint256 collateralBalanceOfReserve = _balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
+        uint32 reserveRatio = collaterals[_collateral].reserveRatio;
+        uint256 returnAmount = formula.calculatePurchaseReturn(collateralSupply, collateralBalanceOfReserve, reserveRatio, depositAmountLessFee);
+
         // collect fee and collateral
         if (_collateral == ETH) {
             bool success = address(reserve).call.value(_depositAmount)();
@@ -371,16 +379,9 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         }
 
         // deduct fee
-        uint256 fee = _depositAmount.mul(buyFeePct).div(PCT_BASE);
-        uint256 depositAmountLessFee = _depositAmount.sub(fee);
         if (fee > 0) {
             reserve.transfer(_collateral, beneficiary, fee);
         }
-
-        uint256 collateralSupply = token.totalSupply().add(collaterals[_collateral].virtualSupply);
-        uint256 collateralBalanceOfReserve = _balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
-        uint32 reserveRatio = collaterals[_collateral].reserveRatio;
-        uint256 returnAmount = formula.calculatePurchaseReturn(collateralSupply, collateralBalanceOfReserve, reserveRatio, depositAmountLessFee);
 
         require(returnAmount >= _minReturnAmountAfterFee, ERROR_SLIPPAGE_EXCEEDS_LIMIT);
 
