@@ -45,23 +45,8 @@ module.exports = {
         params: [],
       },
       {
-        name: 'Add tokens as whitelisted collaterals',
-        id: 'ADD_COLLATERAL_TOKEN_ROLE',
-        params: [],
-      },
-      {
-        name: 'Remove tokens as whitelisted collaterals',
-        id: 'REMOVE_COLLATERAL_TOKEN_ROLE',
-        params: [],
-      },
-      {
-        name: 'Update collateral tokens collateralization settings',
-        id: 'UPDATE_COLLATERAL_TOKEN_ROLE',
-        params: [],
-      },
-      {
-        name: 'Open trading',
-        id: 'OPEN_TRADING_ROLE',
+        name: 'Manage collateral tokens collateralization settings',
+        id: 'MANAGE_COLLATERAL_TOKEN_ROLE',
         params: [],
       },
       {
