@@ -255,6 +255,7 @@ contract('AugmentedBondingCurve app', (accounts) => {
   const makeSellOrder = async (seller, collateral, paidAmount, minReturnAmount, opts = {}) => {
     const from = opts && opts.from ? opts.from : seller
     return marketMaker.makeSellOrder(seller, collateral, paidAmount, minReturnAmount, {
+      ...opts,
       from,
     })
   }
@@ -832,6 +833,26 @@ contract('AugmentedBondingCurve app', (accounts) => {
                   )
                 })
 
+                it('it should make buy order on behalf of another account', async () => {
+                  const amount = random.amount()
+                  const expectedReturnAmount = await expectedPurchaseReturnForAmount(index, amount)
+                  const senderBalanceBefore = await token.balanceOf(authorized)
+
+                  const receipt = await makeBuyOrder(
+                    authorized2,
+                    collaterals[index],
+                    amount,
+                    expectedReturnAmount,
+                    { from: authorized }
+                  )
+
+                  const senderBalanceAfterAcc1 = await token.balanceOf(authorized)
+                  const senderBalanceAfterAcc2 = await token.balanceOf(authorized2)
+                  assertEvent(receipt, 'MakeBuyOrder')
+                  assertBn(senderBalanceAfterAcc1, 0)
+                  assertBn(senderBalanceAfterAcc2.sub(senderBalanceBefore), expectedReturnAmount)
+                })
+
                 it('it should deduct fee', async () => {
                   const beneficiaryBalanceBefore = bn(
                     await getBalance(collaterals[index], beneficiary)
@@ -995,10 +1016,42 @@ contract('AugmentedBondingCurve app', (accounts) => {
                       collaterals[index],
                       tokenBalanceBefore,
                       expectedSaleReturn,
-                      { from: authorized2 }
+                      { from: authorized, gasPrice: 0 }
                     )
 
                     const tokenBalanceAfter = await token.balanceOf(authorized)
+                    const collateralBalanceAfter = await balanceOf(authorized, collaterals[index])
+                    const reserveBalanceAfter = await reserve.balance(collaterals[index])
+                    const collateralReturned = collateralBalanceAfter.sub(collateralBalanceBefore)
+
+                    assertEvent(sellReceipt, 'MakeSellOrder')
+                    assertBn(tokenBalanceAfter, 0)
+                    assert.closeTo(reserveBalanceAfter.toNumber(), 0, 1)
+                    assertBn(await token.totalSupply(), 0)
+                    assertBn(collateralReturned, expectedSaleReturn)
+                  })
+
+                  it('it should make sell order on behalf of somebody else', async () => {
+                    await makeBuyOrder(authorized2, collaterals[index], random.amount(), 0, {
+                      from: authorized,
+                    })
+
+                    const collateralBalanceBefore = await balanceOf(authorized, collaterals[index])
+                    const tokenBalanceBefore = await token.balanceOf(authorized2)
+                    const expectedSaleReturn = await expectedSaleReturnForAmount(
+                      index,
+                      tokenBalanceBefore
+                    )
+
+                    const sellReceipt = await makeSellOrder(
+                      authorized,
+                      collaterals[index],
+                      tokenBalanceBefore,
+                      expectedSaleReturn,
+                      { from: authorized2 }
+                    )
+
+                    const tokenBalanceAfter = await token.balanceOf(authorized2)
                     const collateralBalanceAfter = await balanceOf(authorized, collaterals[index])
                     const reserveBalanceAfter = await reserve.balance(collaterals[index])
                     const collateralReturned = collateralBalanceAfter.sub(collateralBalanceBefore)
@@ -1174,7 +1227,10 @@ contract('AugmentedBondingCurve app', (accounts) => {
         { from: authorized }
       )
 
-      assertExternalEvent(receipt, 'MakeBuyOrder(address,address,uint256,uint256,uint256,uint256)')
+      assertExternalEvent(
+        receipt,
+        'MakeBuyOrder(address,address,address,uint256,uint256,uint256,uint256)'
+      )
     })
 
     it('reverts when does not have MAKE_BUY_ORDER_ROLE', async () => {

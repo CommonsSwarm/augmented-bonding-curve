@@ -90,6 +90,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     );
     event MakeBuyOrder(
         address indexed buyer,
+        address indexed onBehalfOf,
         address indexed collateral,
         uint256 fee,
         uint256 purchaseAmount,
@@ -98,6 +99,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
     );
     event MakeSellOrder(
         address indexed seller,
+        address indexed onBehalfOf,
         address indexed collateral,
         uint256 fee,
         uint256 sellAmount,
@@ -226,29 +228,29 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
 
     /**
      * @notice Make a buy order worth `@tokenAmount(_collateral, _depositAmount)` for atleast `@tokenAmount(self.token(): address, _minReturnAmountAfterFee)`
-     * @param _buyer The address of the buyer
+     * @param _onBehalfOf The address of the address who is going to receive the tokens
      * @param _collateral The address of the collateral token to be deposited
      * @param _depositAmount The amount of collateral token to be deposited
      * @param _minReturnAmountAfterFee The minimum amount of the returned bonded tokens
      */
-    function makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
-        external payable authP(MAKE_BUY_ORDER_ROLE, arr(_buyer))
+    function makeBuyOrder(address _onBehalfOf, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
+        external payable authP(MAKE_BUY_ORDER_ROLE, arr(msg.sender, _onBehalfOf))
     {
-        _makeBuyOrder(_buyer, _collateral, _depositAmount, _minReturnAmountAfterFee);
+        _makeBuyOrder(msg.sender, _onBehalfOf, _collateral, _depositAmount, _minReturnAmountAfterFee);
     }
 
     /**
      * @notice Make a sell order worth `@tokenAmount(self.token(): address, _sellAmount)` for atleast `@tokenAmount(_collateral, _minReturnAmountAfterFee)`
-     * @param _seller The address of the seller
+     * @param _onBehalfOf The address of the account who is going to receive the tokens
      * @param _collateral The address of the collateral token to be returned
      * @param _sellAmount The amount of bonded token to be spent
      * @param _minReturnAmountAfterFee The minimum amount of the returned collateral tokens
     */
-    function makeSellOrder(address _seller, address _collateral, uint256 _sellAmount, uint256 _minReturnAmountAfterFee)
-        external nonReentrant authP(MAKE_SELL_ORDER_ROLE, arr(_seller))
+    function makeSellOrder(address _onBehalfOf, address _collateral, uint256 _sellAmount, uint256 _minReturnAmountAfterFee)
+        external nonReentrant authP(MAKE_SELL_ORDER_ROLE, arr(msg.sender, _onBehalfOf))
     {
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
-        require(_bondAmountIsValid(_seller, _sellAmount), ERROR_INVALID_BOND_AMOUNT);
+        require(_bondAmountIsValid(msg.sender, _sellAmount), ERROR_INVALID_BOND_AMOUNT);
 
         uint256 collateralSupply = token.totalSupply().add(collaterals[_collateral].virtualSupply);
         uint256 collateralBalanceOfReserve = _balanceOf(address(reserve), _collateral).add(collaterals[_collateral].virtualBalance);
@@ -260,16 +262,16 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
 
         require(returnAmountLessFee >= _minReturnAmountAfterFee, ERROR_SLIPPAGE_EXCEEDS_LIMIT);
 
-        tokenManager.burn(_seller, _sellAmount);
+        tokenManager.burn(msg.sender, _sellAmount);
 
         if (returnAmountLessFee > 0) {
-            reserve.transfer(_collateral, _seller, returnAmountLessFee);
+            reserve.transfer(_collateral, _onBehalfOf, returnAmountLessFee);
         }
         if (fee > 0) {
             reserve.transfer(_collateral, beneficiary, fee);
         }
 
-        emit MakeSellOrder(_seller, _collateral, fee, _sellAmount, returnAmountLessFee, sellFeePct);
+        emit MakeSellOrder(msg.sender, _onBehalfOf, _collateral, fee, _sellAmount, returnAmountLessFee, sellFeePct);
     }
 
     /**
@@ -278,7 +280,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
      * @param _amount Token amount
      * @param _token Token that received approval
      * @param _buyOrderData Data for the below function call
-     *      makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
+     *      makeBuyOrder(address _onBehalfOf, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
     */
     function receiveApproval(address _from, uint256 _amount, address _token, bytes _buyOrderData) public {
         require(_token == msg.sender, ERROR_TOKEN_NOT_SENDER);
@@ -339,8 +341,8 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         return msg.value == 0;
     }
 
-    function _bondAmountIsValid(address _seller, uint256 _amount) internal view returns (bool) {
-        return _amount != 0 && tokenManager.spendableBalanceOf(_seller) >= _amount;
+    function _bondAmountIsValid(address _account, uint256 _amount) internal view returns (bool) {
+        return _amount != 0 && tokenManager.spendableBalanceOf(_account) >= _amount;
     }
 
     function _collateralIsWhitelisted(address _collateral) internal view returns (bool) {
@@ -351,12 +353,13 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
 
     /**
      * @dev Make a buy order
-     * @param _buyer The address of the buyer
+     * @param _sender The address of the account who is going to pay for the tokens
+     * @param _onBehalfOf The address of the account who is going to receive the tokens
      * @param _collateral The address of the collateral token to be deposited
      * @param _depositAmount The amount of collateral token to be deposited
      * @param _minReturnAmountAfterFee The minimum amount of the returned bonded tokens
      */
-    function _makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
+    function _makeBuyOrder(address _sender, address _onBehalfOf, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
         internal nonReentrant
     {
         require(_collateralIsWhitelisted(_collateral), ERROR_COLLATERAL_NOT_WHITELISTED);
@@ -375,7 +378,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
             bool success = address(reserve).call.value(_depositAmount)();
             require(success, ERROR_TRANSFER_FAILED);
         } else {
-            require(ERC20(_collateral).safeTransferFrom(_buyer, address(reserve), _depositAmount), ERROR_TRANSFER_FAILED);
+            require(ERC20(_collateral).safeTransferFrom(_sender, address(reserve), _depositAmount), ERROR_TRANSFER_FAILED);
         }
 
         // deduct fee
@@ -386,10 +389,10 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         require(returnAmount >= _minReturnAmountAfterFee, ERROR_SLIPPAGE_EXCEEDS_LIMIT);
 
         if (returnAmount > 0) {
-            tokenManager.mint(_buyer, returnAmount);
+            tokenManager.mint(_onBehalfOf, returnAmount);
         }
 
-        emit MakeBuyOrder(_buyer, _collateral, fee, depositAmountLessFee, returnAmount, buyFeePct);
+        emit MakeBuyOrder(_sender, _onBehalfOf, _collateral, fee, depositAmountLessFee, returnAmount, buyFeePct);
     }
 
     /**
@@ -397,19 +400,18 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
      *      without a pre-approval transaction, but that have been approved in this transaction.
      * @param _from Token sender
      * @param _token Token that received approval
-     * @param _amount Token amount
      * @param _buyOrderData Data for the below function call
-     *      makeBuyOrder(address _buyer, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
+     *      makeBuyOrder(address _onBehalfOf, address _collateral, uint256 _depositAmount, uint256 _minReturnAmountAfterFee)
     */
     function _makeBuyOrderRaw(address _from, address _token, uint256 _amount, bytes memory _buyOrderData)
         internal
     {
-        // 32 + 4 + 32 + 32 + 32 = 132 (bytes array length + sig + address _buyer + address _collateral + uint256 _depositAmount)
+        // 32 + 4 + 32 + 32 + 32 = 132 (bytes array length + sig + address _onBehalfOf + address _collateral + uint256 _depositAmount)
         require(_buyOrderData.length == 132, ERROR_INVALID_BUY_ORDER_DATA);
         bytes memory buyOrderDataCopy = _buyOrderData;
 
         bytes4 functionSig;
-        address buyerAddress;
+        address onBehalfOfAddress;
         address collateralTokenAddress;
         uint256 depositAmount;
         uint256 minReturnAmountAfterFee;
@@ -418,25 +420,25 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
             // functionSigByteLocation: 32 (bytes array length)
             functionSig := mload(add(buyOrderDataCopy, 32))
 
-            // buyerAddressByteLocation: 32 + 4 = 36 (bytes array length + sig)
-            buyerAddress := mload(add(buyOrderDataCopy, 36))
+            // onBehalfOfAddressByteLocation: 32 + 4 = 36 (bytes array length + sig)
+            onBehalfOfAddress := mload(add(buyOrderDataCopy, 36))
 
-            // collateralAddressByteLocation: 32 + 4 + 32 = 68 (bytes array length + sig + address _buyer)
+            // collateralAddressByteLocation: 32 + 4 + 32 = 68 (bytes array length + sig + address _onBehalfOf)
             collateralTokenAddress := mload(add(buyOrderDataCopy, 68))
 
-            // depositAmountByteLocation: 32 + 4 + 32 + 32 = 100 (bytes array length + sig + address _buyer + address _collateral)
+            // depositAmountByteLocation: 32 + 4 + 32 + 32 = 100 (bytes array length + sig + address _onBehalfOf + address _collateral)
             depositAmount := mload(add(buyOrderDataCopy, 100))
 
-            // minReturnAmountAfterFeeByteLocation: 32 + 4 + 32 + 32 + 32 = 132 (bytes array length + sig + address _buyer + address _collateral + uint256 _depositAmount)
+            // minReturnAmountAfterFeeByteLocation: 32 + 4 + 32 + 32 + 32 = 132 (bytes array length + sig + address _onBehalfOf + address _collateral + uint256 _depositAmount)
             minReturnAmountAfterFee := mload(add(buyOrderDataCopy, 132))
         }
 
         require(functionSig == this.makeBuyOrder.selector, ERROR_NOT_BUY_FUNCTION);
-        require(buyerAddress == _from, ERROR_BUYER_NOT_FROM);
+        require(onBehalfOfAddress == _from, ERROR_BUYER_NOT_FROM);
         require(collateralTokenAddress == _token, ERROR_COLLATERAL_NOT_SENDER);
         require(depositAmount == _amount, ERROR_DEPOSIT_NOT_AMOUNT);
 
-        _makeBuyOrder(buyerAddress, collateralTokenAddress, depositAmount, minReturnAmountAfterFee);
+        _makeBuyOrder(_from, onBehalfOfAddress, collateralTokenAddress, depositAmount, minReturnAmountAfterFee);
     }
 
     function _updateBeneficiary(address _beneficiary) internal {

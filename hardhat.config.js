@@ -52,18 +52,19 @@ module.exports = {
       {
         name: 'Make buy orders',
         id: 'MAKE_BUY_ORDER_ROLE',
-        params: ['Buyer'],
+        params: ['Buyer', 'On behalf of'],
       },
       {
         name: 'Make sell orders',
         id: 'MAKE_SELL_ORDER_ROLE',
-        params: ['Seller'],
+        params: ['Seller', 'On behalf of'],
       },
     ],
     appBuildOutputPath: 'public/',
   },
   networks: {
     hardhat: {
+      initialBaseFeePerGas: 0,
       // process.env.HARDHAT_FORK will specify the network that the fork is made from.
       // this line ensure the use of the corresponding accounts
       accounts: accounts(process.env.HARDHAT_FORK),
