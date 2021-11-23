@@ -305,7 +305,7 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
 
     /* check functions */
 
-    function _balanceOf(address _who, address _token) internal view isInitialized returns (uint256) {
+    function _balanceOf(address _who, address _token) internal view returns (uint256) {
         return _token == ETH ? _who.balance : ERC20(_token).staticBalanceOf(_who);
     }
 
