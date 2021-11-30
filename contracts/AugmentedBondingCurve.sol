@@ -434,7 +434,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         }
 
         require(functionSig == this.makeBuyOrder.selector, ERROR_NOT_BUY_FUNCTION);
-        require(onBehalfOfAddress == _from, ERROR_BUYER_NOT_FROM);
         require(collateralTokenAddress == _token, ERROR_COLLATERAL_NOT_SENDER);
         require(depositAmount == _amount, ERROR_DEPOSIT_NOT_AMOUNT);
 
