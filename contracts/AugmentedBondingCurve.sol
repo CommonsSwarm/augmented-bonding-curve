@@ -373,6 +373,8 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         uint32 reserveRatio = collaterals[_collateral].reserveRatio;
         uint256 returnAmount = formula.calculatePurchaseReturn(collateralSupply, collateralBalanceOfReserve, reserveRatio, depositAmountLessFee);
 
+        require(returnAmount >= _minReturnAmountAfterFee, ERROR_SLIPPAGE_EXCEEDS_LIMIT);
+
         // collect fee and collateral
         if (_collateral == ETH) {
             bool success = address(reserve).call.value(_depositAmount)();
@@ -385,8 +387,6 @@ contract AugmentedBondingCurve is EtherTokenConstant, IsContract, ApproveAndCall
         if (fee > 0) {
             reserve.transfer(_collateral, beneficiary, fee);
         }
-
-        require(returnAmount >= _minReturnAmountAfterFee, ERROR_SLIPPAGE_EXCEEDS_LIMIT);
 
         if (returnAmount > 0) {
             tokenManager.mint(_onBehalfOf, returnAmount);
